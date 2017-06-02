@@ -1,0 +1,16 @@
+Package: ecodiag
+Type: Package
+Title: Build Standardized Diagnostic Tool Models
+Version: 0.1.0
+Authors@R: person("Mondy", "Cedric", email = "cedric.mondy@gmail.com",
+    role = c("aut", "cre"))
+Description: Build standardized Diagnostic Tool Models to predict anthropogenic pressure
+    intensity/presence from biological data using random forest algorythms.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+Imports: 
+    dplyr (>= 0.5.0),
+    reshape2 (>= 1.4.2),
+    vegan (>= 2.4-2)
+RoxygenNote: 6.0.1
