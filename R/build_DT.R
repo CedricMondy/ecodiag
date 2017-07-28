@@ -1,14 +1,11 @@
 #' Build ecological Diagnostic Tool
 #'
 #' @param pressures a data frame with samples in rows and pressure information
-#'   in columns (one per pressure category). The table is filled either with
-#'   standardized intensities (`type = "gradient"`) or with quality classes
-#'   (i.e. low or impaired; `type = "class"`)
+#'   in columns (one per pressure category). The table is filled with quality
+#'   classes (i.e. low or impaired)
 #'
 #' @param metrics a data frame with the rows as pressures and the investigated
 #'   biological metrics in columns
-#'
-#' @param type character, either class or gradient
 #'
 #' @param path character string, the path where the built models will be saved
 #'
@@ -32,11 +29,10 @@
 #'
 #' @seealso [randomForest]
 #'
-#' @importFrom dplyr '%>%'
+#' @importFrom dplyr "%>%"
 #' @export
 build_DT <- function(pressures,
                      metrics,
-                     type = "gradient",
                      path,
                      calibrate = TRUE,
                      set_prop = c(train     = 0.7,
@@ -102,7 +98,6 @@ build_DT <- function(pressures,
                                         calibrationData = calibrationData,
                                         selMetrics      = selMetrics,
                                         params          = params,
-                                        type            = type,
                                         p               = p,
                                         nCores          = nCores)
 
@@ -110,19 +105,11 @@ build_DT <- function(pressures,
         bestParams <- dplyr::filter(paramCombinations,
                                     perf == max(perf, na.rm = TRUE))
 
-        if (type == "gradient") {
-          nToSample <- (bestParams$sampsize *
-                          nrow(trainingData)) %>%
-            round()
-        } else {
-          if (type == "class") {
-            nToSample <- table(trainingData$pressure) %>%
-              min()                                   %>%
-              '*'(bestParams$sampsize)                %>%
-              round()                                 %>%
-              rep(dplyr::n_distinct(trainingData$pressure))
-          }
-        }
+        nToSample <- table(trainingData$pressure) %>%
+          min()                                   %>%
+          '*'(bestParams$sampsize)                %>%
+          round()                                 %>%
+          rep(dplyr::n_distinct(trainingData$pressure))
 
         calibratedRF <-
           randomForest::randomForest(x          = trainingData[, selMetrics],
@@ -137,18 +124,9 @@ build_DT <- function(pressures,
 
         cat("\n    metric selection...\n")
 
-        if (type == "gradient") {
-          selMetrics <- rownames(calibratedRF$importance)[
-            (calibratedRF$importance[,1] -
-               calibratedRF$importanceSD) > 0]
-        } else {
-          if (type == "class") {
-            selMetrics <- rownames(calibratedRF$importance)[
-              (calibratedRF$importance[, "MeanDecreaseAccuracy"] -
-                 calibratedRF$importanceSD[, "MeanDecreaseAccuracy"]) > 0]
-          }
-        }
-
+        selMetrics <- rownames(calibratedRF$importance)[
+          (calibratedRF$importance[, "MeanDecreaseAccuracy"] -
+             calibratedRF$importanceSD[, "MeanDecreaseAccuracy"]) > 0]
 
         mod <- randomForest::randomForest(x          = trainingData[, selMetrics],
                                           y          = trainingData$pressure,
@@ -165,19 +143,11 @@ build_DT <- function(pressures,
       }
 
     } else {
-      if (type == "gradient") {
-        nToSample <- (params$sampsize[1] *
-                        nrow(modelData)) %>%
-          round()
-      } else {
-        if (type == "class") {
-          nToSample <- table(modelData$pressure) %>%
-            min()                                %>%
-            '*'(params$sampsize[1])              %>%
-            round()                              %>%
-            rep(dplyr::n_distinct(modelData$pressure))
-        }
-      }
+      nToSample <- table(modelData$pressure) %>%
+        min()                                %>%
+        '*'(params$sampsize[1])              %>%
+        round()                              %>%
+        rep(dplyr::n_distinct(modelData$pressure))
 
       mod <- randomForest::randomForest(x          = modelData[, selMetrics],
                                         y          = modelData$pressure,

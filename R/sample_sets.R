@@ -1,4 +1,4 @@
-#' @importFrom dplyr '%>%'
+#' @importFrom dplyr "%>%"
 sample_sets <- function(x,
                         prop      = c(train     = 0.7,
                                       calibrate = 0.15,
