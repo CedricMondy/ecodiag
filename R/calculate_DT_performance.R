@@ -2,7 +2,7 @@
 #' @export
 calculate_DT_performance <- function(modelPath,
                                      sets = c("train", "calibrate", "test")) {
-  modelPath <- "C:/Users/cedri/CloudStation/LIEC_ONEMA/R/Logiciels/ecodiag/temp/models/gradient/"
+  # modelPath <- "C:/Users/cedri/CloudStation/LIEC_ONEMA/R/Logiciels/ecodiag/temp/models/class/"
 
   modelList <- list.files(path       = modelPath,
                           pattern    = "model_*",
@@ -20,12 +20,11 @@ calculate_DT_performance <- function(modelPath,
 
       calc_roc <- function(s) {
         pROC::roc(response  = dplyr::filter(modelData, set == s)$pressure,
-                  predictor = predict(mod,
+                  predictor = predict(DTunit,
                                       newdata = dplyr::filter(modelData,
-                                                              set == s),
-                                      type = "prob")[, "impaired"],
+                                                              set == s)),
                   ci        = TRUE)
-      }
+        }
 
       rocs <- lapply(sets,
                      calc_roc)
@@ -33,6 +32,7 @@ calculate_DT_performance <- function(modelPath,
 
       aucs <- sapply(rocs, '[[', "ci") %>%
         t()                            %>%
+        round(3)                       %>%
         data.table::data.table(pressureList[p],
                                sets,
                                .)
