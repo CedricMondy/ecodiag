@@ -196,3 +196,16 @@ build_DT <- function(pressures,
     }
    }
 }
+
+#' @export
+predict.DTmodel <- function(DTunit, newdata) {
+  IR <- predict(object  = DTunit$rf,
+                newdata = newdata,
+                type    = "prob")[, "impaired"]
+
+  IP <- approx(x = c(0, DTunit$threshold, 1),
+               y = c(0, 0.5, 1),
+               xout = IR)$y
+
+  return(IP)
+}
