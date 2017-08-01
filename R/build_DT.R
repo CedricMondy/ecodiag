@@ -1,14 +1,11 @@
 #' Build ecological Diagnostic Tool
 #'
 #' @param pressures a data frame with samples in rows and pressure information
-#'   in columns (one per pressure category). The table is filled either with
-#'   standardized intensities (`type = "gradient"`) or with quality classes
-#'   (i.e. low or impaired; `type = "class"`)
+#'   in columns (one per pressure category). The table is filled with quality
+#'   classes (i.e. low or impaired)
 #'
 #' @param metrics a data frame with the rows as pressures and the investigated
 #'   biological metrics in columns
-#'
-#' @param type character, either class or gradient
 #'
 #' @param path character string, the path where the built models will be saved
 #'
@@ -32,11 +29,10 @@
 #'
 #' @seealso [randomForest]
 #'
-#' @importFrom dplyr '%>%'
+#' @importFrom dplyr "%>%"
 #' @export
 build_DT <- function(pressures,
                      metrics,
-                     type = "gradient",
                      path,
                      calibrate = TRUE,
                      set_prop = c(train     = 0.7,
@@ -102,7 +98,6 @@ build_DT <- function(pressures,
                                         calibrationData = calibrationData,
                                         selMetrics      = selMetrics,
                                         params          = params,
-                                        type            = type,
                                         p               = p,
                                         nCores          = nCores)
 
@@ -110,19 +105,11 @@ build_DT <- function(pressures,
         bestParams <- dplyr::filter(paramCombinations,
                                     perf == max(perf, na.rm = TRUE))
 
-        if (type == "gradient") {
-          nToSample <- (bestParams$sampsize *
-                          nrow(trainingData)) %>%
-            round()
-        } else {
-          if (type == "class") {
-            nToSample <- table(trainingData$pressure) %>%
-              min()                                   %>%
-              '*'(bestParams$sampsize)                %>%
-              round()                                 %>%
-              rep(dplyr::n_distinct(trainingData$pressure))
-          }
-        }
+        nToSample <- table(trainingData$pressure) %>%
+          min()                                   %>%
+          '*'(bestParams$sampsize)                %>%
+          round()                                 %>%
+          rep(dplyr::n_distinct(trainingData$pressure))
 
         calibratedRF <-
           randomForest::randomForest(x          = trainingData[, selMetrics],
@@ -137,18 +124,9 @@ build_DT <- function(pressures,
 
         cat("\n    metric selection...\n")
 
-        if (type == "gradient") {
-          selMetrics <- rownames(calibratedRF$importance)[
-            (calibratedRF$importance[,1] -
-               calibratedRF$importanceSD) > 0]
-        } else {
-          if (type == "class") {
-            selMetrics <- rownames(calibratedRF$importance)[
-              (calibratedRF$importance[, "MeanDecreaseAccuracy"] -
-                 calibratedRF$importanceSD[, "MeanDecreaseAccuracy"]) > 0]
-          }
-        }
-
+        selMetrics <- rownames(calibratedRF$importance)[
+          (calibratedRF$importance[, "MeanDecreaseAccuracy"] -
+             calibratedRF$importanceSD[, "MeanDecreaseAccuracy"]) > 0]
 
         mod <- randomForest::randomForest(x          = trainingData[, selMetrics],
                                           y          = trainingData$pressure,
@@ -160,24 +138,32 @@ build_DT <- function(pressures,
                                           maxnodes   = bestParams$maxnodes,
                                           importance = TRUE)
 
-        save(mod, modelData, paramCombinations,
+        dataErrors <- data.frame(IR = predict(object  = mod,
+                                              newdata = trainingData,
+                                              type    = "prob")[, "impaired"],
+                                 pressure = trainingData$pressure)
+
+        IPthreshold <- optimize(f    = calc_errors,
+                                data = dataErrors,
+                                adjust   = 5,
+                                interval = c(0,1)) %>%
+          '$'("minimum")                           %>%
+          round(digits = 2)
+
+        DTunit        <- list(rf        = mod,
+                              threshold = IPthreshold)
+        class(DTunit) <- "DTmodel"
+
+        save(DTunit, modelData, paramCombinations,
              file = file.path(path, paste0("model_", p, ".rda")))
       }
 
     } else {
-      if (type == "gradient") {
-        nToSample <- (params$sampsize[1] *
-                        nrow(modelData)) %>%
-          round()
-      } else {
-        if (type == "class") {
-          nToSample <- table(modelData$pressure) %>%
-            min()                                %>%
-            '*'(params$sampsize[1])              %>%
-            round()                              %>%
-            rep(dplyr::n_distinct(modelData$pressure))
-        }
-      }
+      nToSample <- table(modelData$pressure) %>%
+        min()                                %>%
+        '*'(params$sampsize[1])              %>%
+        round()                              %>%
+        rep(dplyr::n_distinct(modelData$pressure))
 
       mod <- randomForest::randomForest(x          = modelData[, selMetrics],
                                         y          = modelData$pressure,
@@ -189,8 +175,37 @@ build_DT <- function(pressures,
                                         maxnodes   = params$maxnodes[1],
                                         importance = TRUE)
 
-      save(mod, modelData,
+      dataErrors <- data.frame(IR = predict(object  = mod,
+                                            newdata = modelData,
+                                            type    = "prob")[, "impaired"],
+                               pressure = modelData$pressure)
+
+      IPthreshold <- optimize(f    = calc_errors,
+                              data = dataErrors,
+                              adjust   = 5,
+                              interval = c(0,1)) %>%
+        '$'("minimum")                           %>%
+        round(digits = 2)
+
+      DTunit        <- list(rf        = mod,
+                            threshold = IPthreshold)
+      class(DTunit) <- "DTmodel"
+
+      save(DTunit, modelData,
            file = file.path(path, paste0("model_", p, ".rda")))
     }
    }
+}
+
+#' @export
+predict.DTmodel <- function(object, newdata) {
+  IR <- predict(object  = object$rf,
+                newdata = newdata,
+                type    = "prob")[, "impaired"]
+
+  IP <- approx(x = c(0, object$threshold, 1),
+               y = c(0, 0.5, 1),
+               xout = IR)$y
+
+  return(IP)
 }
