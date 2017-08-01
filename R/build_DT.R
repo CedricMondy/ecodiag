@@ -138,7 +138,23 @@ build_DT <- function(pressures,
                                           maxnodes   = bestParams$maxnodes,
                                           importance = TRUE)
 
-        save(mod, modelData, paramCombinations,
+        dataErrors <- data.frame(IR = predict(object  = mod,
+                                              newdata = trainingData,
+                                              type    = "prob")[, "impaired"],
+                                 pressure = trainingData$pressure)
+
+        IPthreshold <- optimize(f    = calc_errors,
+                                data = dataErrors,
+                                adjust   = 5,
+                                interval = c(0,1)) %>%
+          '$'("minimum")                           %>%
+          round(digits = 2)
+
+        DTunit        <- list(rf        = mod,
+                              threshold = IPthreshold)
+        class(DTunit) <- "DTmodel"
+
+        save(DTunit, modelData, paramCombinations,
              file = file.path(path, paste0("model_", p, ".rda")))
       }
 
@@ -159,7 +175,23 @@ build_DT <- function(pressures,
                                         maxnodes   = params$maxnodes[1],
                                         importance = TRUE)
 
-      save(mod, modelData,
+      dataErrors <- data.frame(IR = predict(object  = mod,
+                                            newdata = modelData,
+                                            type    = "prob")[, "impaired"],
+                               pressure = modelData$pressure)
+
+      IPthreshold <- optimize(f    = calc_errors,
+                              data = dataErrors,
+                              adjust   = 5,
+                              interval = c(0,1)) %>%
+        '$'("minimum")                           %>%
+        round(digits = 2)
+
+      DTunit        <- list(rf        = mod,
+                            threshold = IPthreshold)
+      class(DTunit) <- "DTmodel"
+
+      save(DTunit, modelData,
            file = file.path(path, paste0("model_", p, ".rda")))
     }
    }
