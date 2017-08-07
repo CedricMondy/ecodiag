@@ -12,7 +12,7 @@ run_DT <- function(modelPath, data) {
     gsub(pattern     = ".rda",
          replacement = "")
 
-  preds <- lapply(modelList,
+  preds <- pbapply::pblapply(modelList,
                   function(p) {
                     load(p)
                     predict(object  = DTunit,
