@@ -3,4 +3,5 @@
 S3method(predict,DTmodel)
 export(build_DT)
 export(calculate_DT_performance)
+export(run_DT)
 importFrom(dplyr,"%>%")
