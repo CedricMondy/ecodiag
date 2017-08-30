@@ -15,8 +15,8 @@ run_DT <- function(modelPath, data) {
   preds <- pbapply::pblapply(modelList,
                   function(p) {
                     load(p)
-                    predict(object  = DTunit,
-                            newdata = data)
+                    predict_DT(object  = DTunit,
+                               newdata = data)
                   })                       %>%
     do.call(what = cbind)                  %>%
     data.frame(row.names = rownames(data)) %>%

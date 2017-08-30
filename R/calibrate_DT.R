@@ -10,23 +10,18 @@ calibrate_DT <- function(trainingData, calibrationData,
                                 calibrationData,
                                 selMetrics) {
 
-    nToSample <-
-      table(trainingData$pressure) %>%
-      min()                        %>%
-      '*'(combination$sampsize)    %>%
-      round()                      %>%
-      rep(dplyr::n_distinct(trainingData$pressure))
-
     rf <-
-      try(randomForest::randomForest(x = trainingData[, selMetrics],
-                                     y = trainingData$pressure,
-                                     mtry     = combination$mtry,
-                                     ntree    = 150,
-                                     replace  = FALSE,
-                                     nodesize = combination$nodesize,
-                                     maxnodes = combination$maxnodes,
-                                     strata   = trainingData$pressure,
-                                     sampsize = nToSample),
+      try(ranger::ranger(data            = trainingData[, c("pressure", selMetrics)],
+                         formula         = pressure ~ .,
+                         replace         = FALSE,
+                         mtry            = combination$mtry,
+                         num.trees       = 250,
+                         min.node.size   = combination$min.node.size,
+                         sample.fraction = combination$sample.fraction,
+                         write.forest    = TRUE,
+                         probability     = TRUE,
+                         case.weights    = (1 - table(trainingData$pressure) /
+                                              nrow(trainingData))[trainingData$pressure]),
           silent = TRUE)
 
     if ("try-error" %in% class(rf)) {
@@ -34,8 +29,7 @@ calibrate_DT <- function(trainingData, calibrationData,
     } else {
       perf <- pROC::roc(calibrationData$pressure,
                         predict(rf,
-                                newdata = calibrationData,
-                                type    = "prob")[, "impaired"])$auc
+                                data = calibrationData)$predictions[, "impaired"])$auc
     }
 
     return(perf)

@@ -19,10 +19,11 @@ calculate_DT_performance <- function(modelPath,
     load(modelList[p])
 
       calc_roc <- function(s) {
-        pROC::roc(response  = dplyr::filter(modelData, set == s)$pressure,
-                  predictor = predict(DTunit,
-                                      newdata = dplyr::filter(modelData,
-                                                              set == s)),
+        subData <- dplyr::filter(modelData, set == s)
+
+        pROC::roc(response  = subData$pressure,
+                  predictor = predict_DT(DTunit,
+                                         newdata = subData),
                   ci        = TRUE)
         }
 
