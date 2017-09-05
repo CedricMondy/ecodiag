@@ -23,7 +23,8 @@ calculate_DT_performance <- function(modelPath,
 
         pROC::roc(response  = subData$pressure,
                   predictor = predict_DT(DTunit,
-                                         newdata = subData),
+                                         newdata    = subData,
+                                         uncertainty = FALSE),
                   ci        = TRUE)
         }
 

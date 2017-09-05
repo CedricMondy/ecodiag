@@ -189,9 +189,30 @@ build_DT <- function(pressures,
 }
 
 #' @export
-predict_DT <- function(object, newdata) {
-  IR <- stats::predict(object  = object,
-                       data    = newdata)$predictions[, "impaired"]
+predict_DT <- function(object, newdata, uncertainty = FALSE) {
+  if (!uncertainty) {
+    IR <- stats::predict(object      = object,
+                         data        = newdata,
+                         predict.all = FALSE)$predictions[, "impaired"]
+  } else {
+    IR <- stats::predict(object      = object,
+                         data        = newdata,
+                         predict.all = TRUE)$predictions
+
+    IR <- lapply(1:object$num.trees,
+                 function(i) {
+                   IR[, 2, i]
+                 })         %>%
+      do.call(what = cbind) %>%
+      apply(MARGIN = 1,
+            FUN    = function(x) {
+              c(quantile(x, probs = 0.05),
+                avg = mean(x),
+                quantile(x, probs = 0.95))
+            })              %>%
+      t()
+  }
+
 
   # IP <- approx(x = c(0, object$threshold, 1),
   #              y = c(0, 0.5, 1),
