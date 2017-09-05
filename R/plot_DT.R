@@ -18,24 +18,44 @@ plot_DT <- function(plot.data,
                     plot.legend           = if (nrow(plot.data) > 1) TRUE else FALSE,
                     legend.title          = "",
                     plot.title            = "",
-                    legend.text.size      = grid.label.size ) {
-  values.radar          = c("0.0", "0.5", "1.0")
-  grid.min              = 0
-  grid.mid              = 0.5
-  grid.max              = 1
-  centre.y              = grid.min - ((1/9)*(grid.max - grid.min))
-  plot.extent.x.sf      = 1
-  plot.extent.y.sf      = 1.2
-  x.centre.range        = 0.02*(grid.max - centre.y)
-  gridline.label.offset = -0.1*(grid.max - centre.y)
-  gridline.min.linetype = "longdash"
-  gridline.mid.linetype = "longdash"
-  gridline.max.linetype = "longdash"
+                    legend.text.size      = grid.label.size) {
+  values.radar          <- c("0.0", "0.5", "1.0")
+  grid.min              <- 0
+  grid.mid              <- 0.5
+  grid.max              <- 1
+  centre.y              <- grid.min - ((1/9)*(grid.max - grid.min))
+  plot.extent.x.sf      <- 1
+  plot.extent.y.sf      <- 1.2
+  x.centre.range        <- 0.02*(grid.max - centre.y)
+  gridline.label.offset <- -0.1*(grid.max - centre.y)
+  gridline.min.linetype <- "longdash"
+  gridline.mid.linetype <- "longdash"
+  gridline.max.linetype <- "longdash"
 
-  plot.data <- as.data.frame(plot.data)
+  uncertainty           <- ifelse(test = "avg" %in% names(plot.data),
+                                 TRUE,
+                                 FALSE)
+
+  if (uncertainty) {
+    plot.data.min <- as.data.frame(plot.data$`5%`)
+    plot.data.max <- as.data.frame(plot.data$`95%`)
+    plot.data     <- as.data.frame(plot.data$avg)
+  } else {
+    plot.data     <- as.data.frame(plot.data)
+    plot.data.min <- plot.data.max <- NULL
+  }
 
   plot.data[,1]       <- as.factor(as.character(plot.data[,1]))
   names(plot.data)[1] <- "group"
+
+  if (uncertainty) {
+    plot.data.min[,1]   <-
+      plot.data.max[,1] <-
+      plot.data[,1]
+    names(plot.data.min)[1]   <-
+      names(plot.data.max)[1] <-
+      names(plot.data)[1]
+  }
 
   var.names <- colnames(plot.data)[-1]  #'Short version of variable names
   #axis.labels [if supplied] is designed to hold 'long version' of variable names
@@ -62,7 +82,7 @@ plot_DT <- function(plot.data,
     #  df: Col 1 -  group ('unique' cluster / group ID of entity)
     #      Col 2-n:  v1.value to vn.value - values (e.g. group/cluser mean or median) of variables v1 to v.n
 
-    path <- df[,1]
+    path <- as.factor(df[,1])
 
     ##find increment
     angles <- seq(from = 0, to = 2*pi, by = (2*pi)/(ncol(df) - 1))
@@ -135,11 +155,42 @@ plot_DT <- function(plot.data,
   #[creates plot centroid of 0,0 for internal use, regardless of min. value of y
   # in user-supplied data]
   plot.data.offset <- plot.data
-  plot.data.offset[,2:ncol(plot.data)] <- plot.data[,2:ncol(plot.data)] + abs(centre.y)
+  plot.data.offset[,2:ncol(plot.data.offset)] <-
+    plot.data[,2:ncol(plot.data)] + abs(centre.y)
+
+  if (uncertainty) {
+    plot.data.min.offset <- plot.data.min
+    plot.data.max.offset <- plot.data.max
+
+    plot.data.min.offset[, 2:ncol(plot.data.min.offset)] <-
+      plot.data.min[, 2:ncol(plot.data.min)] + abs(centre.y)
+    plot.data.max.offset[, 2:ncol(plot.data.max.offset)] <-
+      plot.data.max[, 2:ncol(plot.data.max)] + abs(centre.y)
+
+    plot.data.min.offset$group <- paste0(plot.data.min.offset$group, "_min")
+    plot.data.max.offset$group <- paste0(plot.data.max.offset$group, "_max")
+  }
   #print(plot.data.offset)
   # (b) convert into radial coords
   group      <- NULL
-  group$path <- CalculateGroupPath(plot.data.offset)
+
+  if (uncertainty) {
+    plot.data.offset <- rbind(plot.data.min.offset,
+                              plot.data.offset,
+                              plot.data.max.offset)
+
+    allPaths     <- CalculateGroupPath(plot.data.offset)
+    group$path   <- dplyr::filter(allPaths, !grepl("_",   group))
+    group$ribbon <- dplyr::filter(allPaths, grepl("_", group)) %>%
+      dplyr::mutate(group = gsub(group,
+                                 pattern     = "_min",
+                                 replacement = "") %>%
+                      gsub(pattern     = "_max",
+                           replacement = ""))
+  } else {
+    group$path <- CalculateGroupPath(plot.data.offset)
+  }
+
 
   #print(group$path)
   # (c) Calculate coordinates required to plot radial variable axes
@@ -248,7 +299,26 @@ plot_DT <- function(plot.data,
     ggplot2::geom_path(data = axis$path,
                        ggplot2::aes(x = x, y = y,
                                     group = axis.no),
-                       colour = axis.line.colour)                 +
+                       colour = axis.line.colour)
+
+  if (uncertainty) {
+    base <- base +
+      ggplot2::geom_polygon(data = group$ribbon,
+                            ggplot2::aes(x = x, y = y,
+                                         group = group, fill = group),
+                            alpha = 0.5) +
+      ggplot2::scale_fill_manual(guide  = FALSE,
+                                 values =
+                                   rep(c("#FF5A5F", "#FFB400",
+                                         "#007A87",  "#8CE071",
+                                         "#7B0051", "#00D1C1",
+                                         "#FFAA91", "#B4A76C",
+                                         "#9CA299", "#565A5C",
+                                         "#00A04B", "#E54C20"),
+                                       100))
+  }
+
+  base <- base +
     ggplot2::geom_path(data = group$path,
                        ggplot2::aes(x = x, y = y,
                                     group = group, colour = group),

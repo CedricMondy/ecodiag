@@ -18,4 +18,5 @@ Imports:
     ggplot2 (>= 2.2.1),
     parallel (>= 3.3.3),
     pbapply (>= 1.3-3)
+Depends: ranger
 RoxygenNote: 6.0.1
