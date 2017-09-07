@@ -3,6 +3,7 @@
 export(build_DT)
 export(calculate_DT_performance)
 export(plot_DT)
+export(plot_roc)
 export(predict_DT)
 export(run_DT)
 importFrom(dplyr,"%>%")
