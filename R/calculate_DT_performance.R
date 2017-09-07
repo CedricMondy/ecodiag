@@ -43,7 +43,7 @@ calculate_DT_performance <- function(modelPath,
       colnames(aucs) <- c("pressure", "sets",
                           "AUC_2.5%", "AUC", "AUC_97.5%")
 
-      ROCurves <- pROC::ggroc(rocs)                   +
+      ROCurves <- plot_roc(rocobj = rocs)             +
         ggplot2::theme_bw()                           +
         ggplot2::scale_colour_discrete(name   = "Data sets",
                                        breaks = sets) +
