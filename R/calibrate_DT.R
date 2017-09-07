@@ -15,7 +15,7 @@ calibrate_DT <- function(trainingData, calibrationData,
                          formula         = pressure ~ .,
                          replace         = FALSE,
                          mtry            = combination$mtry,
-                         num.trees       = 250,
+                         num.trees       = combination$num.trees,
                          min.node.size   = combination$min.node.size,
                          sample.fraction = combination$sample.fraction,
                          write.forest    = TRUE,
@@ -29,7 +29,8 @@ calibrate_DT <- function(trainingData, calibrationData,
     } else {
       perf <- pROC::roc(calibrationData$pressure,
                         predict(rf,
-                                data = calibrationData)$predictions[, "impaired"])$auc
+                                data = calibrationData)$predictions[, "impaired"],
+                        smooth = TRUE)$auc
     }
 
     return(perf)
