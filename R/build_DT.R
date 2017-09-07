@@ -1,5 +1,30 @@
 #' Build ecological Diagnostic Tool
 #'
+#' This function allows to build an ecological Diagnostic Tool (DT) that
+#' predicts an Impairment Probability for one or several anthropogenic
+#' pressures.
+#'
+#' The function takes as input two tables: one with a binary description (low vs
+#' impaired) of samples by one or several anthropogenic `pressures` and the
+#' second with the values of biological `metrics` calculated from the community
+#' data from the same samples.
+#'
+#' For each pressure (i.e. column in the `pressures` table), a model is built
+#' and saved in the directory given by the `path` argument. The whole set of
+#' models (DT units) saved in this directory constitute the DT.
+#'
+#' Each DT unit is a probability random forest model built using the
+#' [ranger::ranger()] function to predict the probability of a community being
+#' impaired by the pressure considered based on the biological metrics exhibited
+#' by the communities. The hyper-parameters of the [ranger::ranger()] model are
+#' given in the params argument that could accpt one or several values per
+#' parameter. If several parameter values are given and `calibrate = TRUE`, then
+#' a grid search is performed to identify the parameter set exhibiting the best
+#' performance when the model is built using training data and performance
+#' assessed with the independent calibration data set. If `calibrate = TRUE`,
+#' then the metrics exhibiting a negative importance (i.e. that degrade the
+#' model performances) are discarded.
+#'
 #' @param pressures a data frame with samples in rows and pressure information
 #'   in columns (one per pressure category). The table is filled with quality
 #'   classes (i.e. low or impaired)
@@ -19,7 +44,10 @@
 #'     - num.trees: Number of trees to grow;
 #'     - mtry: Number of variables randomly sampled as candidates at each split;
 #'     - sample.fraction: Proportion of samples to draw;
-#'     - min.node.size: Minimum size of terminal nodes;
+#'     - min.node.size: Minimum size of terminal nodes
+#'
+#' @param nCores an integer indicating the number of CPU cores available to
+#'   parallelize the calibration step
 #'
 #' @return nothing, the models and used data are saved as .rda objects in the
 #'   directory corresponding to the path argument.
