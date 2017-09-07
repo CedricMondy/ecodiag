@@ -104,14 +104,42 @@ build_DT <- function(pressures,
                          formula         = pressure ~ .,
                          replace         = FALSE,
                          mtry            = bestParams$mtry,
-                         num.trees       = 250,
+                         num.trees       = bestParams$num.trees,
                          min.node.size   = bestParams$min.node.size,
                          sample.fraction = bestParams$sample.fraction,
                          importance      = 'impurity',
                          write.forest    = TRUE,
                          probability     = TRUE,
                          case.weights    = (1 - table(trainingData$pressure) /
-                                              nrow(trainingData))[trainingData$pressure])
+                                              nrow(trainingData))[trainingData$pressure]
+                         )
+        cat("\n    forest prunning...\n")
+
+        ntrees <- seq(from = 50, to = calibratedRF$num.trees, by = 50)
+
+        aucsCalibration <- data.frame(
+          ntree = ntrees,
+          AUC   = pbapply::pbsapply(
+            ntrees,
+            function(i) {
+              pred.i <- stats::predict(calibratedRF,
+                                       data      = calibrationData,
+                                       num.trees = i)$predictions
+
+              pROC::roc(response  = calibrationData$pressure,
+                        predictor = pred.i[, "impaired"],
+                        smooth    = TRUE)$auc
+            }
+            )
+          )
+
+
+        aucsCalibration$smoothAUC <- stats::loess(data    = aucsCalibration,
+                                                  formula = AUC ~ ntree) %>%
+          stats::predict()
+
+        ntreeOptim <- dplyr::filter(aucsCalibration,
+                                    smoothAUC == max(smoothAUC))$ntree
 
         cat("\n    metric selection...\n")
 
@@ -122,7 +150,7 @@ build_DT <- function(pressures,
                               formula         = pressure ~ .,
                               replace         = FALSE,
                               mtry            = bestParams$mtry,
-                              num.trees       = bestParams$num.trees,
+                              num.trees       = ntreeOptim,
                               min.node.size   = bestParams$min.node.size,
                               sample.fraction = bestParams$sample.fraction,
                               importance      = 'impurity',
@@ -131,21 +159,7 @@ build_DT <- function(pressures,
                               case.weights    = (1 - table(trainingData$pressure) /
                                                    nrow(trainingData))[trainingData$pressure])
 
-        # dataErrors <- data.frame(IR = predict(object  = mod,
-        #                                       data    = trainingData)$predictions[, "impaired"],
-        #                          pressure = trainingData$pressure)
-        #
-        # IPthreshold <- optimize(f    = calc_errors,
-        #                         data = dataErrors,
-        #                         adjust   = 5,
-        #                         interval = c(0,1)) %>%
-        #   '$'("minimum")                           %>%
-        #   round(digits = 2)
-        #
-        # DTunit        <- list(rf        = mod,
-        #                       threshold = IPthreshold)
         DTunit        <- mod
-        # class(DTunit) <- "DTmodel"
 
         save(DTunit, modelData, paramCombinations,
              file = file.path(path, paste0("model_", p, ".rda")))
@@ -166,21 +180,7 @@ build_DT <- function(pressures,
                             case.weights    = (1 - table(modelData$pressure) /
                                                  nrow(modelData))[modelData$pressure])
 
-      # dataErrors <- data.frame(IR = predict(object  = mod,
-      #                                       data    = modelData)$preditions[, "impaired"],
-      #                          pressure = modelData$pressure)
-      #
-      # IPthreshold <- optimize(f    = calc_errors,
-      #                         data = dataErrors,
-      #                         adjust   = 5,
-      #                         interval = c(0,1)) %>%
-      #   '$'("minimum")                           %>%
-      #   round(digits = 2)
-      #
-      # DTunit        <- list(rf        = mod,
-      #                       threshold = IPthreshold)
       DTunit        <- mod
-      # class(DTunit) <- "DTmodel"
 
       save(DTunit, modelData,
            file = file.path(path, paste0("model_", p, ".rda")))
@@ -191,17 +191,17 @@ build_DT <- function(pressures,
 #' @export
 predict_DT <- function(object, newdata, uncertainty = FALSE) {
   if (!uncertainty) {
-    IR <- stats::predict(object      = object,
+    IP <- stats::predict(object      = object,
                          data        = newdata,
                          predict.all = FALSE)$predictions[, "impaired"]
   } else {
-    IR <- stats::predict(object      = object,
+    IP <- stats::predict(object      = object,
                          data        = newdata,
                          predict.all = TRUE)$predictions
 
-    IR <- lapply(1:object$num.trees,
+    IP <- lapply(1:object$num.trees,
                  function(i) {
-                   IR[, 2, i]
+                   IP[, 2, i]
                  })         %>%
       do.call(what = cbind) %>%
       apply(MARGIN = 1,
@@ -214,10 +214,5 @@ predict_DT <- function(object, newdata, uncertainty = FALSE) {
   }
 
 
-  # IP <- approx(x = c(0, object$threshold, 1),
-  #              y = c(0, 0.5, 1),
-  #              xout = IR)$y
-  #
-  # return(IP)
-  return(IR)
+  return(IP)
 }
