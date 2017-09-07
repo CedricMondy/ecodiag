@@ -53,8 +53,8 @@ calculate_DT_performance <- function(modelPath,
 
     }
 
-    modelPerformances <- lapply(1:length(modelList),
-                                calc_model_performance)
+    modelPerformances <- pbapply::pblapply(1:length(modelList),
+                                           calc_model_performance)
 
     AUC <- lapply(modelPerformances,
                   "[[", "AUC") %>%
