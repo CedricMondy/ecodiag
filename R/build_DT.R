@@ -111,7 +111,35 @@ build_DT <- function(pressures,
                          write.forest    = TRUE,
                          probability     = TRUE,
                          case.weights    = (1 - table(trainingData$pressure) /
-                                              nrow(trainingData))[trainingData$pressure])
+                                              nrow(trainingData))[trainingData$pressure]
+                         )
+        cat("\n    forest prunning...\n")
+
+        ntrees <- seq(from = 50, to = calibratedRF$num.trees, by = 50)
+
+        aucsCalibration <- data.frame(
+          ntree = ntrees,
+          AUC   = pbapply::pbsapply(
+            ntrees,
+            function(i) {
+              pred.i <- stats::predict(calibratedRF,
+                                       data      = calibrationData,
+                                       num.trees = i)$predictions
+
+              pROC::roc(response  = calibrationData$pressure,
+                        predictor = pred.i[, "impaired"],
+                        smooth    = TRUE)$auc
+            }
+            )
+          )
+
+
+        aucsCalibration$smoothAUC <- stats::loess(data    = aucsCalibration,
+                                                  formula = AUC ~ ntree) %>%
+          stats::predict()
+
+        ntreeOptim <- dplyr::filter(aucsCalibration,
+                                    smoothAUC == max(smoothAUC))$ntree
 
         cat("\n    metric selection...\n")
 
@@ -122,7 +150,7 @@ build_DT <- function(pressures,
                               formula         = pressure ~ .,
                               replace         = FALSE,
                               mtry            = bestParams$mtry,
-                              num.trees       = bestParams$num.trees,
+                              num.trees       = ntreeOptim,
                               min.node.size   = bestParams$min.node.size,
                               sample.fraction = bestParams$sample.fraction,
                               importance      = 'impurity',
