@@ -1,7 +1,8 @@
 #' @importFrom dplyr "%>%"
 #' @export
 calculate_DT_performance <- function(modelPath,
-                                     sets = c("train", "calibrate", "test")) {
+                                     sets = c("train", "calibrate", "test"),
+                                     smoothROC = TRUE) {
   # modelPath <- "C:/Users/cedri/CloudStation/LIEC_ONEMA/R/Logiciels/ecodiag/temp/models/class/"
 
   modelList <- list.files(path       = modelPath,
@@ -25,7 +26,8 @@ calculate_DT_performance <- function(modelPath,
                   predictor = predict_DT(DTunit,
                                          newdata    = subData,
                                          uncertainty = FALSE),
-                  ci        = TRUE)
+                  ci        = TRUE,
+                  smooth    = smoothROC)
         }
 
       rocs <- lapply(sets,
