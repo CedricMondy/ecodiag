@@ -1,6 +1,6 @@
-#' @importFrom dplyr '%>%'
+#' @importFrom dplyr "%>%"
 calibrate_DT <- function(trainingData, calibrationData,
-                         selMetrics, params, type, p, nCores) {
+                         selMetrics, params, p, nCores) {
 
   paramCombinations <-  expand.grid(params) %>%
     data.frame()
@@ -8,75 +8,40 @@ calibrate_DT <- function(trainingData, calibrationData,
   test_randomForest <- function(combination,
                                 trainingData,
                                 calibrationData,
-                                selMetrics,
-                                type) {
+                                selMetrics) {
 
-    if (type == "class") {
-      nToSample <-
-        table(trainingData$pressure) %>%
-        min()                        %>%
-        '*'(combination$sampsize)    %>%
-        round()                      %>%
-        rep(dplyr::n_distinct(trainingData$pressure))
+    rf <-
+      try(ranger::ranger(data            = trainingData[, c("pressure", selMetrics)],
+                         formula         = pressure ~ .,
+                         replace         = FALSE,
+                         mtry            = combination$mtry,
+                         num.trees       = combination$num.trees,
+                         min.node.size   = combination$min.node.size,
+                         sample.fraction = combination$sample.fraction,
+                         write.forest    = TRUE,
+                         probability     = TRUE,
+                         case.weights    = (1 - table(trainingData$pressure) /
+                                              nrow(trainingData))[trainingData$pressure]),
+          silent = TRUE)
 
-      rf <-
-        try(randomForest::randomForest(x = trainingData[, selMetrics],
-                                       y = trainingData$pressure,
-                                       mtry     = combination$mtry,
-                                       ntree    = 150,
-                                       replace  = FALSE,
-                                       nodesize = combination$nodesize,
-                                       maxnodes = combination$maxnodes,
-                                       strata   = trainingData$pressure,
-                                       sampsize = nToSample),
-            silent = TRUE)
-
-      if ("try-error" %in% class(rf)) {
-        return(NA)
-      } else {
-        perf <- pROC::roc(calibrationData$pressure,
-                          predict(rf,
-                                  newdata = calibrationData,
-                                  type    = "prob")[, "impaired"])$auc
-      }
+    if ("try-error" %in% class(rf)) {
+      perf <- NA
     } else {
-      if (type == "gradient") {
-        nToSample <- (combination$sampsize * nrow(trainingData)) %>%
-          round()
-
-        rf <-
-          try(randomForest::randomForest(x = trainingData[, selMetrics],
-                                         y = trainingData$pressure,
-                                         xtest    = calibrationData[, selMetrics],
-                                         ytest    = calibrationData$pressure,
-                                         mtry     = combination$mtry,
-                                         ntree    = 150,
-                                         replace  = FALSE,
-                                         nodesize = combination$nodesize,
-                                         maxnodes = combination$maxnodes,
-                                         strata   = trainingData$pressure,
-                                         sampsize = nToSample),
-              silent = TRUE)
-
-        if ("try-error" %in% class(rf)) {
-          perf <- NA
-        } else {
-          perf <- 1/rf$test$mse[150]
-        }
-      } else {
-        stop("type should be either class or gradient")
-      }
+      perf <- pROC::roc(calibrationData$pressure,
+                        predict(rf,
+                                data = calibrationData)$predictions[, "impaired"],
+                        smooth = TRUE)$auc
     }
+
     return(perf)
   }
 
-  if (type == "gradient" |
-      (type == "class" & min(table(trainingData$pressure)) >= 100)) {
+  if (min(table(trainingData$pressure)) >= 100) {
     cl <- parallel::makeCluster(nCores)
 
     parallel::clusterExport(cl,
                             c("test_randomForest", "trainingData",
-                              "calibrationData", "selMetrics", "type", "%>%"),
+                              "calibrationData", "selMetrics", "%>%"),
                             envir = environment())
 
     paramCombinations$perf <-
@@ -86,7 +51,6 @@ calibrate_DT <- function(trainingData, calibrationData,
                         trainingData    = trainingData,
                         calibrationData = calibrationData,
                         selMetrics      = selMetrics,
-                        type            = type,
                         cl              = cl)
 
     parallel::stopCluster(cl)
