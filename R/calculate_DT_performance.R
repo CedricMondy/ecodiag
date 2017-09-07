@@ -1,7 +1,8 @@
 #' @importFrom dplyr "%>%"
 #' @export
 calculate_DT_performance <- function(modelPath,
-                                     sets = c("train", "calibrate", "test")) {
+                                     sets = c("train", "calibrate", "test"),
+                                     smoothROC = TRUE) {
   # modelPath <- "C:/Users/cedri/CloudStation/LIEC_ONEMA/R/Logiciels/ecodiag/temp/models/class/"
 
   modelList <- list.files(path       = modelPath,
@@ -25,7 +26,8 @@ calculate_DT_performance <- function(modelPath,
                   predictor = predict_DT(DTunit,
                                          newdata    = subData,
                                          uncertainty = FALSE),
-                  ci        = TRUE)
+                  ci        = TRUE,
+                  smooth    = smoothROC)
         }
 
       rocs <- lapply(sets,
@@ -41,7 +43,7 @@ calculate_DT_performance <- function(modelPath,
       colnames(aucs) <- c("pressure", "sets",
                           "AUC_2.5%", "AUC", "AUC_97.5%")
 
-      ROCurves <- pROC::ggroc(rocs)                   +
+      ROCurves <- plot_roc(rocobj = rocs)             +
         ggplot2::theme_bw()                           +
         ggplot2::scale_colour_discrete(name   = "Data sets",
                                        breaks = sets) +
@@ -51,8 +53,8 @@ calculate_DT_performance <- function(modelPath,
 
     }
 
-    modelPerformances <- lapply(1:length(modelList),
-                                calc_model_performance)
+    modelPerformances <- pbapply::pblapply(1:length(modelList),
+                                           calc_model_performance)
 
     AUC <- lapply(modelPerformances,
                   "[[", "AUC") %>%
