@@ -1,6 +1,6 @@
 #' @importFrom dplyr "%>%"
 calibrate_DT <- function(trainingData, CVfolds = 5,
-                         selMetrics, sampleBlocks = NULL,
+                         selMetrics,
                          params,
                          p, nCores) {
 
@@ -11,8 +11,7 @@ calibrate_DT <- function(trainingData, CVfolds = 5,
 
   task <- mlr::makeClassifTask(data     = trainingData[, c("pressure", selMetrics)],
                                target   = "pressure",
-                               positive = "impaired",
-                               blocking = sampleBlocks)
+                               positive = "impaired")
 
   control <- mlr::makeTuneControlGrid()
 
