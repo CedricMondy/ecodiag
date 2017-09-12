@@ -156,26 +156,23 @@ build_DT <- function(metrics,
 
 
 #' @export
-predict_DT <- function(object, newdata, uncertainty = FALSE, IC = 90, nSim = 100) {
+predict_DT <- function(object,
+                       newdata,
+                       uncertainty = FALSE,
+                       IC          = 90,
+                       nSim        = 100) {
 
-  calc_beta_parameters <- function(mu, variance) {
-    alpha <- ((1 - mu) / variance - 1/mu) * mu^2
-    beta  <- ((1 - mu) / variance - 1/mu) * mu * (1 - mu)
-
-    return(c(alpha = alpha, beta = beta))
-  }
-
-  estimate_beta <- function(nSim, alpha, beta, lower, upper) {
+  estimate_IC <- function(x, nSim, lower, upper, modelAUC) {
     meanSample <- sapply(1:nSim,
                          function(i) {
-                           rbeta(n = 1000,
-                                 shape1 = alpha,
-                                 shape2 = beta) %>%
+                           sample(x       = x,
+                                  size    = length(x),
+                                  replace = TRUE) %>%
                              mean()
                          })
 
     mu    <- mean(meanSample)
-    stdev <- sd(meanSample)
+    stdev <- sd(meanSample) / modelAUC^2
 
     return(c(lower = qnorm(p = lower, mean = mu, sd = stdev),
              mean   = mu,
@@ -183,42 +180,27 @@ predict_DT <- function(object, newdata, uncertainty = FALSE, IC = 90, nSim = 100
   }
 
   if (!uncertainty) {
-    IP <- stats::predict(object      = object,
+    IP <- stats::predict(object      = object$rf,
                          data        = newdata,
                          predict.all = FALSE)$predictions[, "impaired"]
   } else {
     lower <- 0 + (1 - IC/100) / 2
     upper <- 1 - (1 - IC/100) / 2
 
-    IP <- stats::predict(object      = object,
+    IP <- stats::predict(object      = object$rf,
                          data        = newdata,
                          predict.all = TRUE)$predictions
 
-    IP <- lapply(1:object$num.trees,
+    IP <- lapply(1:object$rf$num.trees,
                  function(i) {
                    IP[, 2, i]
                  })         %>%
       do.call(what = cbind) %>%
       apply(MARGIN = 1,
-            function(x) {
-              c(mu       = mean(x),
-                variance = var(x))
-              })            %>%
-      t()                   %>%
-    apply(MARGIN = 1,
-          function(x) {
-            calc_beta_parameters(mu       = x[[1]],
-                                 variance = x[[2]])
-            })              %>%
-      t()                   %>%
-      apply(MARGIN = 1,
-            function(x) {
-              estimate_beta(nSim  = nSim,
-                            alpha = x[[1]],
-                            beta  = x[[2]],
-                            lower = lower,
-                            upper = upper)
-            })              %>%
+            estimate_IC,
+            nSim = nSim,
+            lower = lower, upper = upper,
+            modelAUC = object$auc) %>%
       t()
   }
 
