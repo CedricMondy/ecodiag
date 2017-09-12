@@ -236,12 +236,40 @@ build_DT <- function(training,
 }
 
 #' @export
-predict_DT <- function(object, newdata, uncertainty = FALSE) {
+predict_DT <- function(object, newdata, uncertainty = FALSE, IC = 90, nSim = 100) {
+
+  calc_beta_parameters <- function(mu, variance) {
+    alpha <- ((1 - mu) / variance - 1/mu) * mu^2
+    beta  <- ((1 - mu) / variance - 1/mu) * mu * (1 - mu)
+
+    return(c(alpha = alpha, beta = beta))
+  }
+
+  estimate_beta <- function(nSim, alpha, beta, lower, upper) {
+    meanSample <- sapply(1:nSim,
+                         function(i) {
+                           rbeta(n = 1000,
+                                 shape1 = alpha,
+                                 shape2 = beta) %>%
+                             mean()
+                         })
+
+    mu    <- mean(meanSample)
+    stdev <- sd(meanSample)
+
+    return(c(lower = qnorm(p = lower, mean = mu, sd = stdev),
+             mean   = mu,
+             upper = qnorm(p = upper, mean = mu, sd = stdev)))
+  }
+
   if (!uncertainty) {
     IP <- stats::predict(object      = object,
                          data        = newdata,
                          predict.all = FALSE)$predictions[, "impaired"]
   } else {
+    lower <- 0 + (1 - IC/100) / 2
+    upper <- 1 - (1 - IC/100) / 2
+
     IP <- stats::predict(object      = object,
                          data        = newdata,
                          predict.all = TRUE)$predictions
@@ -252,14 +280,27 @@ predict_DT <- function(object, newdata, uncertainty = FALSE) {
                  })         %>%
       do.call(what = cbind) %>%
       apply(MARGIN = 1,
-            FUN    = function(x) {
-              c(quantile(x, probs = 0.05),
-                avg = mean(x),
-                quantile(x, probs = 0.95))
+            function(x) {
+              c(mu       = mean(x),
+                variance = var(x))
+              })            %>%
+      t()                   %>%
+    apply(MARGIN = 1,
+          function(x) {
+            calc_beta_parameters(mu       = x[[1]],
+                                 variance = x[[2]])
+            })              %>%
+      t()                   %>%
+      apply(MARGIN = 1,
+            function(x) {
+              estimate_beta(nSim  = nSim,
+                            alpha = x[[1]],
+                            beta  = x[[2]],
+                            lower = lower,
+                            upper = upper)
             })              %>%
       t()
   }
-
 
   return(IP)
 }
