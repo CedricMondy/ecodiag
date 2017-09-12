@@ -10,7 +10,7 @@
 #' data from the same samples.
 #'
 #' For each pressure (i.e. column in the `pressures` table), a model is built
-#' and saved in the directory given by the `path` argument. The whole set of
+#' and saved in the directory given by the `pathDT` argument. The whole set of
 #' models (DT units) saved in this directory constitute the DT.
 #'
 #' Each DT unit is a probability random forest model built using the
@@ -32,7 +32,7 @@
 #' @param metrics a data frame with the rows as pressures and the investigated
 #'   biological metrics in columns
 #'
-#' @param path character string, the path where the built models will be saved
+#' @param pathDT character string, the path where the built models will be saved
 #'
 #' @param calibrate logical, should the model be calibrated to limit overfitting
 #'
@@ -50,197 +50,159 @@
 #'   parallelize the calibration step
 #'
 #' @return nothing, the models and used data are saved as .rda objects in the
-#'   directory corresponding to the path argument.
+#'   directory corresponding to the pathDT argument.
 #'
 #' @seealso [ranger]
 #'
 #' @importFrom dplyr "%>%"
 #' @export
-build_DT <- function(pressures,
-                     metrics,
-                     path,
-                     calibrate = TRUE,
-                     set_prop = c(train     = 0.7,
-                                  calibrate = 0.15,
-                                  test      = 0.15),
-                     params    = list(num.trees    = 500,
-                                      mtry     = seq(5, 50, by = 2.5),
-                                      sample.fraction = seq(0.1, 0.7, by = 0.1),
-                                      min.node.size = 25),
-                     nCores    = 3L) {
+build_DT <- function(metrics,
+                     pressures,
+                     pathDT,
+                     params    = list(num.trees       = 500,
+                                      mtry            = 25,
+                                      sample.fraction = 0.632,
+                                      min.node.size   = 25),
+                     CVfolds      = 5,
+                     sampleBlocks = NULL,
+                     low          = "low",
+                     impaired     = "impaired",
+                     nCores       = 3L) {
+
+  dir.create(path = pathDT, recursive = TRUE)
+
 
   if (nrow(pressures) != nrow(metrics)) {
-    stop("\nThe tables pressures and metrics should have the same rows.")
-  }
-  if (calibrate & length(set_prop) < 2) {
-    stop("\nThe calibration can be done only if at least two sets of data are specified: training and calibration.")
+    stop("pressures and metrics tables should have the same lines")
   }
 
-  if (calibrate & length(set_prop) > 3) {
-    warning("\nOnly the first three elements of set_prop will be considered to allocate samples to training, calibration and test data sets.")
-  }
-
-  if (!is.list(params) |
-      any(!(c("num.trees", "mtry", "sample.fraction", "min.node.size") %in%
-            names(params)))) {
-    stop("\nparams should be a named list with the following elements:\n    num.trees, mtry, sample.fraction and min.node.size")
-  }
-
-  dir.create(path = path, recursive = TRUE)
 
    for (p in colnames(pressures)) {
     cat("\n", p, ":\n", sep = "")
 
-    pressures[[p]][pressures[[p]] == Inf | pressures[[p]] == -Inf] <- NA
-
-    modelData <- data.frame(pressure = pressures[[p]],
-                                  metrics) %>%
-      dplyr::filter(!is.na(pressure))      %>%
+    trainingData <- data.frame(pressure = pressures[[p]],
+                               metrics) %>%
       (function(df) {
-        df           <- dplyr::as.tbl(df)
         colnames(df) <- c("pressure", colnames(metrics))
+
+        df$pressure <- as.character(df$pressure) %>%
+          gsub(pattern = paste(low, collapse = "|"),
+               replacement = "low")              %>%
+          gsub(pattern = paste(impaired, collapse = "|"),
+               replacement = "impaired")         %>%
+          factor(levels = c("low", "impaired"))
+
         df
-      })
-
-    selMetrics    <- colnames(modelData)[-match(c("cd_opecont", "pressure"),
-                                                colnames(modelData))]
-
-    if (calibrate) {
-      modelData$set <- sample_sets(x    = modelData$pressure,
-                                   prop = set_prop)$sample
-
-      trainingData    <- dplyr::filter(.data = modelData,
-                                       set == "train")
-      calibrationData <- dplyr::filter(.data = modelData,
-                                       set == "calibrate")
-
-      cat("\n    calibration...\n")
-
-      paramCombinations <- calibrate_DT(trainingData    = trainingData,
-                                        calibrationData = calibrationData,
-                                        selMetrics      = selMetrics,
-                                        params          = params,
-                                        p               = p,
-                                        nCores          = nCores)
-
-      if (!is.null(paramCombinations)) {
-        bestParams <- dplyr::filter(paramCombinations,
-                                    perf == max(perf, na.rm = TRUE))
-
-        calibratedRF <-
-          ranger::ranger(data            = trainingData[, c("pressure", selMetrics)],
-                         formula         = pressure ~ .,
-                         replace         = FALSE,
-                         mtry            = bestParams$mtry,
-                         num.trees       = bestParams$num.trees,
-                         min.node.size   = bestParams$min.node.size,
-                         sample.fraction = bestParams$sample.fraction,
-                         importance      = 'impurity',
-                         write.forest    = TRUE,
-                         probability     = TRUE,
-                         case.weights    = (1 - table(trainingData$pressure) /
-                                              nrow(trainingData))[trainingData$pressure]
-                         )
-        cat("\n    forest prunning...\n")
-
-        ntrees <- seq(from = 50, to = calibratedRF$num.trees, by = 50)
-
-        aucsCalibration <- data.frame(
-          ntree = ntrees,
-          AUC   = pbapply::pbsapply(
-            ntrees,
-            function(i) {
-              pred.i <- stats::predict(calibratedRF,
-                                       data      = calibrationData,
-                                       num.trees = i)$predictions
-
-              pROC::roc(response  = calibrationData$pressure,
-                        predictor = pred.i[, "impaired"],
-                        smooth    = TRUE)$auc
-            }
-            )
-          )
+      })                                         %>%
+      dplyr::filter(!is.na(pressure))            %>%
+      dplyr::as.tbl()
 
 
-        aucsCalibration$smoothAUC <- stats::loess(data    = aucsCalibration,
-                                                  formula = AUC ~ ntree) %>%
-          stats::predict()
+    selMetrics    <- colnames(trainingData)[-1]
 
-        ntreeOptim <- dplyr::filter(aucsCalibration,
-                                    smoothAUC == max(smoothAUC))$ntree
+    cat("\n    calibration...\n")
 
-        cat("\n    metric selection...\n")
+    bestParams <- calibrate_DT(trainingData    = trainingData,
+                               CVfolds         = CVfolds,
+                               selMetrics      = selMetrics,
+                               sampleBlocks    = sampleBlocks,
+                               params          = params,
+                               p               = p,
+                               nCores          = nCores)
 
-        selMetrics <-
-          names(calibratedRF$variable.importance)[calibratedRF$variable.importance > 0]
+    calibratedRF <-
+      ranger::ranger(data            = trainingData,
+                     formula         = pressure ~ .,
+                     replace         = FALSE,
+                     mtry            = bestParams$x$mtry,
+                     num.trees       = bestParams$x$num.trees,
+                     min.node.size   = bestParams$x$min.node.size,
+                     sample.fraction = bestParams$x$sample.fraction,
+                     importance      = 'impurity',
+                     write.forest    = TRUE,
+                     probability     = TRUE,
+                     case.weights    = (1 - table(trainingData$pressure) /
+                                          nrow(trainingData))[trainingData$pressure]
+      )
 
-        mod <- ranger::ranger(data            = trainingData[, c("pressure", selMetrics)],
-                              formula         = pressure ~ .,
-                              replace         = FALSE,
-                              mtry            = bestParams$mtry,
-                              num.trees       = ntreeOptim,
-                              min.node.size   = bestParams$min.node.size,
-                              sample.fraction = bestParams$sample.fraction,
-                              importance      = 'impurity',
-                              write.forest    = TRUE,
-                              probability     = TRUE,
-                              case.weights    = (1 - table(trainingData$pressure) /
-                                                   nrow(trainingData))[trainingData$pressure])
+    cat("\n    metric selection...\n")
 
-        DTunit        <- mod
+    selMetrics <-
+      names(calibratedRF$variable.importance)[calibratedRF$variable.importance > 0]
 
-        save(DTunit, modelData, paramCombinations,
-             file = file.path(path, paste0("model_", p, ".rda")))
-      }
+    DTunit <- list()
 
-    } else {
+    DTunit$rf <-
+      ranger::ranger(data            = trainingData[, c("pressure", selMetrics)],
+                     formula         = pressure ~ .,
+                     replace         = FALSE,
+                     mtry            = bestParams$x$mtry,
+                     num.trees       = bestParams$x$num.trees,
+                     min.node.size   = bestParams$x$min.node.size,
+                     sample.fraction = bestParams$x$sample.fraction,
+                     importance      = 'impurity',
+                     write.forest    = TRUE,
+                     probability     = TRUE,
+                     case.weights    = (1 - table(trainingData$pressure) /
+                                          nrow(trainingData))[trainingData$pressure])
 
-      mod <- ranger::ranger(data            = modelData[, c("pressure", selMetrics)],
-                            formula         = pressure ~ .,
-                            replace         = FALSE,
-                            mtry            = params$mtry[1],
-                            num.trees       = params$num.trees[1],
-                            min.node.size   = params$min.node.size[1],
-                            sample.fraction = params$sample.fraction[1],
-                            importance      = 'impurity',
-                            write.forest    = TRUE,
-                            probability     = TRUE,
-                            case.weights    = (1 - table(modelData$pressure) /
-                                                 nrow(modelData))[modelData$pressure])
 
-      DTunit        <- mod
+    DTunit$auc <- bestParams$y
 
-      save(DTunit, modelData,
-           file = file.path(path, paste0("model_", p, ".rda")))
-    }
+        save(DTunit, trainingData,
+             file = file.path(pathDT, paste0("model_", p, ".rda")))
    }
 }
 
+
 #' @export
-predict_DT <- function(object, newdata, uncertainty = FALSE) {
+predict_DT <- function(object,
+                       newdata,
+                       uncertainty = FALSE,
+                       IC          = 90,
+                       nSim        = 100) {
+
+  estimate_IC <- function(x, nSim, lower, upper, modelAUC) {
+    meanSample <- sapply(1:nSim,
+                         function(i) {
+                           sample(x       = x,
+                                  size    = length(x),
+                                  replace = TRUE) %>%
+                             mean()
+                         })
+
+    mu    <- mean(meanSample)
+    stdev <- sd(meanSample) / modelAUC^2
+
+    return(c(lower = qnorm(p = lower, mean = mu, sd = stdev),
+             mean   = mu,
+             upper = qnorm(p = upper, mean = mu, sd = stdev)))
+  }
+
   if (!uncertainty) {
-    IP <- stats::predict(object      = object,
+    IP <- stats::predict(object      = object$rf,
                          data        = newdata,
                          predict.all = FALSE)$predictions[, "impaired"]
   } else {
-    IP <- stats::predict(object      = object,
+    lower <- 0 + (1 - IC/100) / 2
+    upper <- 1 - (1 - IC/100) / 2
+
+    IP <- stats::predict(object      = object$rf,
                          data        = newdata,
                          predict.all = TRUE)$predictions
 
-    IP <- lapply(1:object$num.trees,
+    IP <- lapply(1:object$rf$num.trees,
                  function(i) {
                    IP[, 2, i]
                  })         %>%
       do.call(what = cbind) %>%
       apply(MARGIN = 1,
-            FUN    = function(x) {
-              c(quantile(x, probs = 0.05),
-                avg = mean(x),
-                quantile(x, probs = 0.95))
-            })              %>%
+            estimate_IC,
+            nSim = nSim,
+            lower = lower, upper = upper,
+            modelAUC = object$auc) %>%
       t()
   }
-
 
   return(IP)
 }
