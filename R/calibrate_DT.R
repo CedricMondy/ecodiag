@@ -36,9 +36,10 @@ calibrate_DT <- function(trainingData, CVfolds = 5,
     mlr::tuneParams(learner    = learner,
                     task       = task,
                     resampling = sampler,
-                    measures   = list(mlr::auc),
+                    measures   = list(mlr::auc, mlr::timeboth),
                     par.set    = paramSet,
-                    control    = control)
+                    control    = control,
+                    show.info  = FALSE)
   } else {
     warning("Not enough training data to build a model for ", p,
             "\n    not impaired: ",
