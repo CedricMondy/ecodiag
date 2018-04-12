@@ -49,6 +49,10 @@
 #'   intensities (in `pressures`) corresponding to low impact and impaired
 #'   situations, respectively.
 #'
+#' @param nIter integer indicating the number of ranger RF models created for
+#'   each pressure type. nIter larger than 1 allow to estimate prediction
+#'   uncertainty.
+#'
 #' @param nCores an integer indicating the number of CPU cores available to
 #'   parallelize the calibration step
 #'
@@ -69,6 +73,7 @@ build_DT <- function(metrics,
                      CVfolds      = 5,
                      low          = "low",
                      impaired     = "impaired",
+                     nIter        = 1L,
                      nCores       = 3L) {
 
   set.seed(2017)
@@ -108,7 +113,7 @@ build_DT <- function(metrics,
     if (any(sapply(params, length) > 1)) {
       cat("\n    calibration...\n")
 
-      tunedModel <- calibrate_DT(trainingData    = trainingData,
+      tunedModel <- calibrate_DT(trainingData   = trainingData,
                                  CVfolds        = CVfolds,
                                  selMetrics     = selMetrics,
                                  params         = params,
@@ -167,7 +172,7 @@ build_DT <- function(metrics,
                                  sample.fraction = bestParams$sample.fraction,
                                  min.node.size   = bestParams$min.node.size,
                                  task      = task,
-                                 iters     = 30,
+                                 iters     = nIter,
                                  stratify  = TRUE,
                                  models    = TRUE,
                                  keep.pred = TRUE,
