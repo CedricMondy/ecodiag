@@ -105,84 +105,74 @@ build_DT <- function(metrics,
 
     selMetrics    <- colnames(trainingData)[-1]
 
-    cat("\n    calibration...\n")
+    if (any(sapply(params, length) > 1)) {
+      cat("\n    calibration...\n")
 
-    bestParams <- calibrate_DT(trainingData    = trainingData,
-                               CVfolds         = CVfolds,
-                               selMetrics      = selMetrics,
-                               params          = params,
-                               p               = p,
-                               nCores          = nCores)$opt.path %>%
-      as.data.frame()
+      tunedModel <- calibrate_DT(trainingData    = trainingData,
+                                 CVfolds        = CVfolds,
+                                 selMetrics     = selMetrics,
+                                 params         = params,
+                                 p              = p,
+                                 nCores         = nCores)
+      bestParams <- tunedModel$opt.path %>%
+        as.data.frame()
+
+      print(bestParams[, c("num.trees", "mtry",
+                           "sample.fraction", "min.node.size",
+                           "auc.test.mean", "timeboth.test.mean")])
+
+      auc.test.mean <- timeboth.test.mean <-
+        auc.diff <- time.diff <- weight <- NULL
+
+      bestParams <- dplyr::mutate(bestParams,
+                                  auc = auc.test.mean,
+                                  time = timeboth.test.mean) %>%
+        dplyr::mutate(auc_diff = (max(auc) - auc) / (1 - min(auc)),
+                      time_diff = (time - min(time)) / (max(time) - min(time))) %>%
+        dplyr::mutate(weight = 2/3 * auc_diff + 1/3 * time_diff) %>%
+        dplyr::filter(weight == min(weight)) %>%
+        dplyr::mutate(num.trees = as.character(num.trees) %>%
+                        as.numeric(),
+                      mtry = as.character(mtry) %>%
+                        as.numeric(),
+                      sample.fraction = as.character(sample.fraction) %>%
+                        as.numeric(),
+                      min.node.size = as.character(min.node.size) %>%
+                        as.numeric()
+        )
+
+    } else {
+      bestParams <- do.call(what = "cbind", args = params) %>%
+        data.frame()
+    }
+
+    cat("\n    parameter values:\n")
 
     print(bestParams[, c("num.trees", "mtry",
-                         "sample.fraction", "min.node.size",
-                         "auc.test.mean", "timeboth.test.mean")])
+                         "sample.fraction", "min.node.size")])
 
-    auc.test.mean <- timeboth.test.mean <- auc.diff <- time.diff <- weight <- NULL
-    bestParams <- dplyr::mutate(bestParams,
-                                auc = auc.test.mean,
-                                time = timeboth.test.mean) %>%
-      dplyr::mutate(auc_diff = (max(auc) - auc) / (1 - min(auc)),
-                    time_diff = (time - min(time)) / (max(time) - min(time))) %>%
-      dplyr::mutate(weight = 2/3 * auc_diff + 1/3 * time_diff) %>%
-      dplyr::filter(weight == min(weight)) %>%
-      dplyr::mutate(num.trees = as.character(num.trees) %>%
-                      as.numeric(),
-                    mtry = as.character(mtry) %>%
-                      as.numeric(),
-                    sample.fraction = as.character(sample.fraction) %>%
-                      as.numeric(),
-                    min.node.size = as.character(min.node.size) %>%
-                      as.numeric()
-                    )
+    learner <- mlr::makeLearner(cl           = "classif.ranger",
+                                predict.type = "prob",
+                                num.threads  = nCores,
+                                replace      = FALSE)
 
-    cat("\n        selected parameter values:\n")
+    task <- mlr::makeClassifTask(data     = trainingData[, c("pressure",
+                                                             selMetrics)],
+                                 target   = "pressure",
+                                 positive = "impaired")
 
-    print(bestParams[, c("num.trees", "mtry",
-                         "sample.fraction", "min.node.size",
-                         "auc.test.mean", "timeboth.test.mean")])
-
-    calibratedRF <-
-      ranger::ranger(data            = trainingData,
-                     formula         = pressure ~ .,
-                     replace         = FALSE,
-                     mtry            = bestParams$mtry,
-                     num.trees       = bestParams$num.trees,
-                     min.node.size   = bestParams$min.node.size,
-                     sample.fraction = bestParams$sample.fraction,
-                     importance      = 'impurity',
-                     write.forest    = FALSE,
-                     probability     = TRUE,
-                     case.weights    = (1 - table(trainingData$pressure) /
-                                          nrow(trainingData))[trainingData$pressure],
-                     num.threads     = nCores
-      )
-
-    cat("\n    metric selection...\n")
-
-    selMetrics <-
-      names(calibratedRF$variable.importance)[calibratedRF$variable.importance > 0]
-
-    DTunit <- list()
-
-    DTunit$rf <-
-      ranger::ranger(data            = trainingData[, c("pressure", selMetrics)],
-                     formula         = pressure ~ .,
-                     replace         = FALSE,
-                     mtry            = bestParams$mtry,
-                     num.trees       = bestParams$num.trees,
-                     min.node.size   = bestParams$min.node.size,
-                     sample.fraction = bestParams$sample.fraction,
-                     importance      = 'impurity',
-                     write.forest    = TRUE,
-                     probability     = TRUE,
-                     case.weights    = (1 - table(trainingData$pressure) /
-                                          nrow(trainingData))[trainingData$pressure],
-                     num.threads     = nCores)
-
-
-    DTunit$auc <- bestParams$auc
+    DTunit <- mlr::bootstrapB632(learner         = learner,
+                                 num.trees       = bestParams$num.trees,
+                                 mtry            = bestParams$mtry,
+                                 sample.fraction = bestParams$sample.fraction,
+                                 min.node.size   = bestParams$min.node.size,
+                                 task      = task,
+                                 iters     = 30,
+                                 stratify  = TRUE,
+                                 models    = TRUE,
+                                 keep.pred = TRUE,
+                                 measures  = list(mlr::auc, mlr::timeboth),
+                                 show.info = FALSE)
 
         save(DTunit, trainingData,
              file = file.path(pathDT, paste0("model_", p, ".rda")))
@@ -190,12 +180,31 @@ build_DT <- function(metrics,
 }
 
 
-#' @import ranger
+#' @import mlr
 #' @export
 predict_DT <- function(object,
-                       newdata) {
+                       newdata,
+                       pred.all = TRUE) {
 
-    IP <- stats::predict(object      = object$rf,
-                         data        = newdata,
-                         predict.all = FALSE)$predictions[, "impaired"]
+  IP_all <- pbapply::pblapply(object$models,
+                              predict,
+                              newdata = newdata) %>%
+    lapply(function(pred) {
+      pred$data$prob.impaired
+    })                                           %>%
+    do.call(what = cbind)                        %>%
+    data.frame()                                 %>%
+    dplyr::as.tbl()
+  colnames(IP_all) <- paste("iter", 1:length(object$models), sep = "_")
+
+  IP_summ <- apply(IP_all, 1, mean) %>%
+    data.frame()                    %>%
+    dplyr::as.tbl()
+  colnames(IP_summ) <- "average"
+
+  if (pred.all) {
+    return(list(IP_all = IP_all, IP_summ = IP_summ))
+  } else {
+    return(IP_summ)
+  }
 }

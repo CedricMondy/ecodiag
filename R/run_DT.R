@@ -12,13 +12,16 @@ run_DT <- function(modelPath, data) {
     gsub(pattern     = ".rda",
          replacement = "")
 
-  preds <- pbapply::pblapply(modelList,
-                             function(p) {
-                               load(p)
-                               predict_DT(object      = DTunit,
-                                          newdata     = data)
-                             })            %>%
-    do.call(what = cbind)                  %>%
+  preds <- lapply(1:length(modelList),
+                  function(i) {
+                    cat("\n", pressureList[i], "\n")
+                    DTunit <- NULL
+                    load(modelList[i])
+                    predict_DT(object      = DTunit,
+                               newdata     = data,
+                               pred.all    = FALSE)
+                    })    %>%
+    do.call(what = cbind) %>%
     data.frame(ID = rownames(data), .)
 
   colnames(preds) <- c("ID", pressureList)

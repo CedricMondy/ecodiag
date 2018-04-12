@@ -1,7 +1,8 @@
 #' @importFrom dplyr "%>%"
 #' @export
 calculate_DT_performance <- function(modelPath,
-                                     data,
+                                     pressures,
+                                     metrics,
                                      low       = "low",
                                      impaired  = "impaired",
                                      smoothROC = TRUE) {
@@ -18,16 +19,19 @@ calculate_DT_performance <- function(modelPath,
          replacement = "")
 
     calc_model_performance <- function(i, low, impaired) {
+      cat("\n", pressureList[i], "\n")
+
       DTunit <- NULL
+
       load(modelList[i])
 
-      calc_roc <- function(data.s, p, low, impaired, smoothROC) {
+      calc_roc <- function(pressures, metrics, p, low, impaired, smoothROC) {
         pressure <- NULL
 
-        subData <- data.frame(pressure = data.s$pressures[[p]],
-                              data.s$metrics)        %>%
+        subData <- data.frame(pressure = pressures[[p]],
+                              metrics)               %>%
           (function(df) {
-            colnames(df) <- c("pressure", colnames(data.s$metrics))
+            colnames(df) <- c("pressure", colnames(metrics))
 
             df$pressure <- as.character(df$pressure) %>%
               gsub(pattern = paste(low, collapse = "|"),
@@ -41,50 +45,71 @@ calculate_DT_performance <- function(modelPath,
           dplyr::filter(!is.na(pressure))
 
 
-        pROC::roc(response  = subData$pressure,
-                  predictor = predict_DT(object      = DTunit,
-                                         newdata     = subData),
-                  ci        = TRUE,
-                  smooth    = smoothROC)
+        preds <- predict_DT(object      = DTunit,
+                            newdata     = subData,
+                            pred.all    = TRUE)$IP_all
+
+        apply(preds,
+              MARGIN = 2,
+              function(j) {
+                pROC::roc(response  = subData$pressure,
+                          predictor = j,
+                          smooth    = smoothROC)
+              })
         }
 
-      if (is.null(names(data))) {
-        names(data) <- paste("data", 1:length(data))
+      testRocs <- calc_roc(pressures = pressures,
+                           metrics   = metrics,
+                           p         = pressureList[i],
+                           low       = low,
+                           impaired  = impaired,
+                           smoothROC = smoothROC)
+
+      set <- NULL
+
+      trainRocs <- dplyr::filter(DTunit$pred$data,
+                                 set == "test") %>%
+        split(x = ., f = as.factor(.$iter))     %>%
+        lapply(function(df) {
+          pROC::roc(response  = df$truth,
+                    predictor = df$prob.impaired,
+                    smooth    = smoothROC)
+        })
+
+      summarise_auc <- function(x) {
+        paste0(round(mean(x), 3),
+               " (+/- ",
+               round(sd(x), 3),
+               ")")
       }
 
-      rocs <- lapply(data,
-                     calc_roc,
-                     p         = pressureList[i],
-                     low       = low,
-                     impaired  = impaired,
-                     smoothROC = smoothROC)
-
-      aucs <- sapply(rocs, '[[', "ci") %>%
-        t()                            %>%
-        round(3)                       %>%
+      aucs <- sapply(testRocs, '[[', "auc") %>%
+        summarise_auc()                     %>%
+        t()                                 %>%
         data.frame(pressureList[i],
-                   round(DTunit$auc, 3),
-                   names(data),
-                   .)
-      colnames(aucs) <- c("pressure", "AUC training", "data",
-                          "CI 5%", "AUC", "CI 95%")
+              summarise_auc(DTunit$measures.test$auc) %>%
+                t(),
+              .,
+              stringsAsFactors = FALSE)
 
-      ROCurves <- plot_roc(rocobj = rocs)             +
-        ggplot2::theme_bw()                           +
+      colnames(aucs) <- c("pressure",
+                          "AUC training",
+                          "AUC test")
+
+      ROCurves <- plot_roc(rocobj = trainRocs, rocobj2 = testRocs,
+                           rocNames = c("training", "test")) +
         ggplot2::scale_colour_discrete(name   = "Data sets") +
-        ggplot2::ggtitle(pressureList[i])             +
-        ggplot2::geom_label(x = -0.125, y = 0.06,
-                            label = paste("AUC training =", round(DTunit$auc, 3)),
-                            colour = "black")
+        ggplot2::scale_fill_discrete(name = "Data sets")     +
+        ggplot2::ggtitle(pressureList[i])
 
       return(list(AUC = aucs, ROC = ROCurves))
 
     }
 
-    modelPerformances <- pbapply::pblapply(1:length(modelList),
-                                           calc_model_performance,
-                                           low      = low,
-                                           impaired = impaired)
+    modelPerformances <- lapply(1:length(modelList),
+                                calc_model_performance,
+                                low      = low,
+                                impaired = impaired)
 
     AUC <- lapply(modelPerformances,
                   "[[", "AUC") %>%
