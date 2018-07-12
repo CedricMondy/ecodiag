@@ -135,10 +135,11 @@ build_DT <- function(metrics,
         auc.diff <- time.diff <- weight <- NULL
 
       bestParams <- dplyr::mutate(bestParams,
-                                  auc = auc.test.mean,
-                                  time = timeboth.test.mean) %>%
-        dplyr::mutate(auc_diff = (max(auc) - auc) / (1 - min(auc)),
-                      time_diff = (time - min(time)) / (max(time) - min(time))) %>%
+                                  AUC = auc.test.mean,
+                                  ellapsedTime = timeboth.test.mean) %>%
+        dplyr::mutate(auc_diff = (max(AUC) - AUC) / (1 - min(AUC)),
+                      time_diff = (ellapsedTime - min(ellapsedTime)) /
+                        (max(ellapsedTime) - min(ellapsedTime))) %>%
         dplyr::mutate(weight = 2/3 * auc_diff + 1/3 * time_diff) %>%
         dplyr::filter(weight == min(weight)) %>%
         dplyr::mutate(num.trees = as.character(num.trees) %>%
