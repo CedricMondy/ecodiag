@@ -1,11 +1,25 @@
-Package: DTmodels
+Package: ecodiag
 Type: Package
 Title: Build Standardized Diagnostic Tool Models
-Version: 0.1.0
+Version: 0.0.3
 Authors@R: person("Mondy", "Cedric", email = "cedric.mondy@gmail.com",
     role = c("aut", "cre"))
 Description: Build standardized Diagnostic Tool Models to predict anthropogenic pressure
-    intensity/presence from biological data using random forest algorythms.
+    intensity/presence from biological data using random forest algorithms.
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
+Imports:
+    dplyr (>= 0.7.6),
+    ggplot2 (>= 3.0.0),
+    mlr (>= 2.12.1),
+    parallel (>= 3.5.1),
+    ParamHelpers (>= 1.11),
+    pbapply (>= 1.3-4),
+    pROC (>= 1.12.1),
+    ranger (>= 0.10.1),
+    reshape2 (>= 1.4.3)
+Depends:
+    R (>= 3.5)
+RoxygenNote: 6.0.1
+Roxygen: list(markdown = TRUE)
