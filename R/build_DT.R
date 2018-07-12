@@ -14,10 +14,10 @@
 #' models (DT units) saved in this directory constitute the DT.
 #'
 #' Each DT unit is a probability random forest model built using the
-#' [ranger][ranger::ranger()] function to predict the probability of a community
+#' [ranger][ranger::ranger] function to predict the probability of a community
 #' being impaired by the pressure considered based on the biological metrics
 #' exhibited by the communities. The hyper-parameters of the
-#' [ranger][ranger::ranger()] model are given in the params argument that could
+#' [ranger][ranger::ranger] model are given in the params argument that could
 #' accpt one or several values per parameter. If several parameter values are
 #' given, then a grid search using [tuneParams][mlr::tuneParams] is performed to
 #' identify the parameter set exhibiting the best trade-off between performance
@@ -31,12 +31,11 @@
 #'
 #' @param pressures a data frame with samples in rows and pressure information
 #'   in columns (one per pressure category). The table is filled with quality
-#'   classes (i.e. low or impaired)
+#'   classes (e.g. low or impaired)
 #'
 #' @param pathDT character string, the path where the built models will be saved
 #'
-#' @param params a named list with the values of the following ranger random
-#'   forest parameters:
+#' @param params a named list with the values of the following parameters:
 #'       - num.trees: Number of trees to grow;
 #'       - mtry: Number of variables randomly sampled as candidates at each split;
 #'       - sample.fraction: Proportion of samples to draw;
@@ -46,12 +45,12 @@
 #'   training data set and used to calibrate the model hyper-parameters.
 #'
 #' @param low,impaired character vectors with the labels of the pressure
-#'   intensities (in `pressures`) corresponding to low impact and impaired
+#'   classes (in `pressures`) corresponding to low impact and impaired
 #'   situations, respectively.
 #'
 #' @param nIter integer indicating the number of ranger RF models created for
 #'   each pressure type. nIter larger than 1 allow to estimate prediction
-#'   uncertainty.
+#'   uncertainty and improve model robustness.
 #'
 #' @param nCores an integer indicating the number of CPU cores available to
 #'   parallelize the calibration step
