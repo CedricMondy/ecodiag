@@ -46,7 +46,7 @@ the appearance of background circle}
 \description{
 This function is a wrapper around the
 \href{https://github.com/ricardo-bion/ggradar/blob/master/R/ggradar.R}{ggradar}
-function.
+function and produces radar plot for the DT model predictions.
 }
 \references{
 script adapted from

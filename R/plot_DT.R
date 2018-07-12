@@ -2,7 +2,7 @@
 #'
 #' This function is a wrapper around the
 #' [ggradar](https://github.com/ricardo-bion/ggradar/blob/master/R/ggradar.R)
-#' function.
+#' function and produces radar plot for the DT model predictions.
 #'
 #' @param plot.data dataframe comprising samples in rows and DT model
 #'   predictions in columns (as returned by [run_DT][run_DT])
