@@ -81,7 +81,7 @@ calculate_DT_performance <- function(pathDT,
       summarise_auc <- function(x) {
         paste0(round(mean(x), 3),
                " (+/- ",
-               round(sd(x), 3),
+               round(stats::sd(x), 3),
                ")")
       }
 
