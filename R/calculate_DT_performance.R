@@ -1,3 +1,27 @@
+#' Calculate the performances of a DT
+#'
+#' This function allows to quantify the performances of a DT model built using
+#' the  [build_DT][build_DT] function, ideally using a different data set than
+#' the one used to train the DT.
+#'
+#' The function will calculate the ROC curves (smoothed or not depending on
+#' argument `smoothROC`) and the corresponding Area Under the Curve (AUC) for
+#' each of the DT models using (i) the training data set stored in the models
+#' and (ii) a test data set (provided using `pressures` and `metrics`).
+#'
+#' @inheritParams build_DT
+#'
+#' @param smoothROC if TRUE, the ROC curve is passed to [smooth][pROC::smooth]
+#'   to be smoothed.
+#'
+#' @return a list with two elements:
+#'     - `AUC`: a data frame with the calculated AUC in both the training and
+#'     test data sets;
+#'     - `ROC`: a list of ggplot objects (one per DT model) containing the ROC
+#'     curves
+#'
+#' @seealso [roc][pROC::roc] [build_DT][build_DT]
+#'
 #' @importFrom dplyr "%>%"
 #' @export
 calculate_DT_performance <- function(pathDT,
