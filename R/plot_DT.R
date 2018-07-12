@@ -4,8 +4,8 @@
 #' [ggradar](https://github.com/ricardo-bion/ggradar/blob/master/R/ggradar.R)
 #' function.
 #'
-#' @param plot.data dataframe comprising samples in rows (col1 = sample or
-#'   sample group ID); cols 2-n = DT model predictions
+#' @param plot.data dataframe comprising samples in rows and DT model
+#'   predictions in columns (as returned by [run_DT][run_DT])
 #' @param axis.labels names of axis labels if other than column names supplied
 #'   via plot.data
 #' @param grid.line.width,gridline.min.colour,gridline.mid.colour,gridline.max.colour
