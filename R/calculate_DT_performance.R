@@ -1,18 +1,20 @@
 #' @importFrom dplyr "%>%"
 #' @export
-calculate_DT_performance <- function(modelPath,
+calculate_DT_performance <- function(pathDT,
                                      pressures,
                                      metrics,
                                      low       = "low",
                                      impaired  = "impaired",
                                      smoothROC = TRUE) {
 
-  modelList <- list.files(path       = modelPath,
+  . <- NULL
+
+  modelList <- list.files(path       = pathDT,
                           pattern    = "model_*",
                           full.names = TRUE)
 
   pressureList <- gsub(modelList,
-                       pattern     = paste0(modelPath,
+                       pattern     = paste0(pathDT,
                                             "model_"),
                        replacement = "") %>%
     gsub(pattern     = ".rda",
