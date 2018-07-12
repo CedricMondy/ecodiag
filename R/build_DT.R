@@ -77,6 +77,9 @@ build_DT <- function(metrics,
 
   set.seed(2017)
 
+  num.trees <- mtry <- sample.fraction <- min.node.size <- ellapsedTime <-
+    AUC <- auc_diff <- time_diff <- NULL
+
   dir.create(path = pathDT, recursive = TRUE)
 
 
@@ -88,7 +91,8 @@ build_DT <- function(metrics,
 
    for (p in colnames(pressures)) {
     cat("\n", p, ":\n", sep = "")
-     cat("\n", p, ":\n", sep = "", file = paste0(pathDT, "log.csv"), append = TRUE)
+     cat("\n", p, ":\n", sep = "",
+         file = paste0(pathDT, "log.csv"), append = TRUE)
 
      pressure <- NULL
 
@@ -113,7 +117,8 @@ build_DT <- function(metrics,
 
     if (any(sapply(params, length) > 1)) {
       cat("\n    calibration...\n")
-      cat("\n    calibration...\n", file = paste0(pathDT, "log.csv"), append = TRUE)
+      cat("\n    calibration...\n",
+          file = paste0(pathDT, "log.csv"), append = TRUE)
 
       tunedModel <- calibrate_DT(trainingData   = trainingData,
                                  CVfolds        = CVfolds,
