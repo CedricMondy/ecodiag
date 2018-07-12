@@ -73,7 +73,7 @@ build_DT <- function(metrics,
                      low          = "low",
                      impaired     = "impaired",
                      nIter        = 1L,
-                     nCores       = 3L) {
+                     nCores       = 1L) {
 
   set.seed(2017)
 
