@@ -1,12 +1,13 @@
 #' @importFrom dplyr "%>%"
 #' @export
-run_DT <- function(modelPath, data) {
-  modelList <- list.files(path       = modelPath,
+run_DT <- function(pathDT, newdata) {
+  . <- NULL
+  modelList <- list.files(path       = pathDT,
                           pattern    = "model_*",
                           full.names = TRUE)
 
   pressureList <- gsub(modelList,
-                       pattern     = paste0(modelPath,
+                       pattern     = paste0(pathDT,
                                             "model_"),
                        replacement = "") %>%
     gsub(pattern     = ".rda",
@@ -18,11 +19,11 @@ run_DT <- function(modelPath, data) {
                     DTunit <- NULL
                     load(modelList[i])
                     predict_DT(object      = DTunit,
-                               newdata     = data,
+                               newdata     = newdata,
                                pred.all    = FALSE)
                     })    %>%
     do.call(what = cbind) %>%
-    data.frame(ID = rownames(data), .)
+    data.frame(ID = rownames(newdata), .)
 
   colnames(preds) <- c("ID", pressureList)
 
