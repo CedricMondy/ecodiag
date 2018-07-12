@@ -22,6 +22,8 @@ plot_DT <- function(plot.data,
                     legend.text.size      = grid.label.size,
                     byRow                 = FALSE) {
 
+  ID <- x <- y <- text <- axis.no <- NULL
+
 
   if (byRow) {
     IDs <- plot.data$ID
