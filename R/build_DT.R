@@ -84,9 +84,11 @@ build_DT <- function(metrics,
     stop("pressures and metrics tables should have the same lines")
   }
 
+  cat("Building DT", file = paste0(pathDT, "log.csv"))
 
    for (p in colnames(pressures)) {
     cat("\n", p, ":\n", sep = "")
+     cat("\n", p, ":\n", sep = "", file = paste0(pathDT, "log.csv"), append = TRUE)
 
      pressure <- NULL
 
@@ -111,6 +113,7 @@ build_DT <- function(metrics,
 
     if (any(sapply(params, length) > 1)) {
       cat("\n    calibration...\n")
+      cat("\n    calibration...\n", file = paste0(pathDT, "log.csv"), append = TRUE)
 
       tunedModel <- calibrate_DT(trainingData   = trainingData,
                                  CVfolds        = CVfolds,
@@ -119,11 +122,13 @@ build_DT <- function(metrics,
                                  p              = p,
                                  nCores         = nCores)
       bestParams <- tunedModel$opt.path %>%
-        as.data.frame()
+        as.data.frame() %>%
+        select(num.trees, mtry, sample.fraction,
+               min.node.size, auc.test.mean, timeboth.test.mean)
 
-      print(bestParams[, c("num.trees", "mtry",
-                           "sample.fraction", "min.node.size",
-                           "auc.test.mean", "timeboth.test.mean")])
+      suppressWarnings(write.table(bestParams,
+                                   file = paste0(pathDT, "log.csv"),
+                                   sep = ";", append = TRUE, row.names = FALSE))
 
       auc.test.mean <- timeboth.test.mean <-
         auc.diff <- time.diff <- weight <- NULL
@@ -150,10 +155,17 @@ build_DT <- function(metrics,
         data.frame()
     }
 
-    cat("\n    parameter values:\n")
+    cat("\n    best parameter values:\n")
+    cat("\n    best parameter values:\n",
+        file = paste0(pathDT, "log.csv"), append = TRUE)
 
-    print(bestParams[, c("num.trees", "mtry",
-                         "sample.fraction", "min.node.size")])
+    bestParams <- select(bestParams,
+                         num.trees, mtry, sample.fraction,
+                         min.node.size, auc, time)
+
+    print(bestParams)
+    suppressWarnings(write.table(bestParams, file = paste0(pathDT, "log.csv"),
+          sep = ";", append = TRUE, row.names = FALSE))
 
     learner <- mlr::makeLearner(cl           = "classif.ranger",
                                 predict.type = "prob",
