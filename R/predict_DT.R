@@ -1,5 +1,4 @@
 #' @import mlr
-#' @export
 predict_DT <- function(object,
                        newdata,
                        pred.all = TRUE) {
