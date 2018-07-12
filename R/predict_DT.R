@@ -4,7 +4,7 @@ predict_DT <- function(object,
                        pred.all = TRUE) {
 
   IP_all <- pbapply::pblapply(object$models,
-                              stats::predict,
+                              mlr:::predict.WrappedModel,
                               newdata = newdata) %>%
     lapply(function(pred) {
       pred$data$prob.impaired
