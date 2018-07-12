@@ -5,7 +5,7 @@ predict_DT <- function(object,
                        pred.all = TRUE) {
 
   IP_all <- pbapply::pblapply(object$models,
-                              predict,
+                              stats::predict,
                               newdata = newdata) %>%
     lapply(function(pred) {
       pred$data$prob.impaired
