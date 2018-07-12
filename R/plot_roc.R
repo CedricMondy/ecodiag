@@ -2,8 +2,10 @@ plot_roc <- function(rocobj, rocobj2 = NULL,
                      rocNames = c("rocobj",
                                ifelse(is.null(rocobj2),
                                       NULL, "rocobj2"))) {
-  extractRocData <- function(rocData) {
-    dataPlot <- NULL
+  dataPlot <- . <- specificities <- sensitivities <-
+    legend <- low <- high <- NULL
+
+    extractRocData <- function(rocData) {
 
     if (class(rocData) %in% c("roc", "smooth.roc")) {
       dataPlot <- data.frame(specificity = rocData$specificities,
