@@ -1,3 +1,24 @@
+#' Run a Diagnostic Tool
+#'
+#' This function run a diagnostic tool DT model built using the
+#' [build_DT][build_DT] function on new data.
+#'
+#' The function takes the path where the DT model has been saved and the new
+#' data as inputs. Then, the averaged predictions for each of the DT unit (unit
+#' of a DT model corresponding to a given pressure) are computed and the
+#' predictions of the different DT units are gathered.
+#'
+#' @inheritParams build_DT
+#'
+#' @param newdata a data frame with samples in rows and biological metrics in
+#'   columns
+#'
+#' @return a data frame with the samples from `newdata` in rows and the
+#'   corresponding predictions for the different pressures included in the DT
+#'   model in columns.
+
+#' @seealso [build_DT][build_DT]
+#'
 #' @importFrom dplyr "%>%"
 #' @export
 run_DT <- function(pathDT, newdata) {
