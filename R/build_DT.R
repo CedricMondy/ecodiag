@@ -14,10 +14,10 @@
 #' models (DT units) saved in this directory constitute the DT.
 #'
 #' Each DT unit is a probability random forest model built using the
-#' [ranger][ranger::ranger()] function to predict the probability of a community
+#' [ranger][ranger::ranger] function to predict the probability of a community
 #' being impaired by the pressure considered based on the biological metrics
 #' exhibited by the communities. The hyper-parameters of the
-#' [ranger][ranger::ranger()] model are given in the params argument that could
+#' [ranger][ranger::ranger] model are given in the params argument that could
 #' accpt one or several values per parameter. If several parameter values are
 #' given, then a grid search using [tuneParams][mlr::tuneParams] is performed to
 #' identify the parameter set exhibiting the best trade-off between performance
@@ -31,12 +31,11 @@
 #'
 #' @param pressures a data frame with samples in rows and pressure information
 #'   in columns (one per pressure category). The table is filled with quality
-#'   classes (i.e. low or impaired)
+#'   classes (e.g. low or impaired)
 #'
 #' @param pathDT character string, the path where the built models will be saved
 #'
-#' @param params a named list with the values of the following ranger random
-#'   forest parameters:
+#' @param params a named list with the values of the following parameters:
 #'       - num.trees: Number of trees to grow;
 #'       - mtry: Number of variables randomly sampled as candidates at each split;
 #'       - sample.fraction: Proportion of samples to draw;
@@ -46,8 +45,12 @@
 #'   training data set and used to calibrate the model hyper-parameters.
 #'
 #' @param low,impaired character vectors with the labels of the pressure
-#'   intensities (in `pressures`) corresponding to low impact and impaired
+#'   classes (in `pressures`) corresponding to low impact and impaired
 #'   situations, respectively.
+#'
+#' @param nIter integer indicating the number of ranger RF models created for
+#'   each pressure type. nIter larger than 1 allow to estimate prediction
+#'   uncertainty and improve model robustness.
 #'
 #' @param nCores an integer indicating the number of CPU cores available to
 #'   parallelize the calibration step
@@ -69,9 +72,13 @@ build_DT <- function(metrics,
                      CVfolds      = 5,
                      low          = "low",
                      impaired     = "impaired",
-                     nCores       = 3L) {
+                     nIter        = 1L,
+                     nCores       = 1L) {
 
   set.seed(2017)
+
+  num.trees <- mtry <- sample.fraction <- min.node.size <- ellapsedTime <-
+    AUC <- auc_diff <- time_diff <- NULL
 
   dir.create(path = pathDT, recursive = TRUE)
 
@@ -80,9 +87,12 @@ build_DT <- function(metrics,
     stop("pressures and metrics tables should have the same lines")
   }
 
+  cat("Building DT", file = paste0(pathDT, "log.csv"))
 
    for (p in colnames(pressures)) {
     cat("\n", p, ":\n", sep = "")
+     cat("\n", p, ":\n", sep = "",
+         file = paste0(pathDT, "log.csv"), append = TRUE)
 
      pressure <- NULL
 
@@ -105,97 +115,90 @@ build_DT <- function(metrics,
 
     selMetrics    <- colnames(trainingData)[-1]
 
-    cat("\n    calibration...\n")
+    if (any(sapply(params, length) > 1)) {
+      cat("\n    calibration...\n")
+      cat("\n    calibration...\n",
+          file = paste0(pathDT, "log.csv"), append = TRUE)
 
-    bestParams <- calibrate_DT(trainingData    = trainingData,
-                               CVfolds         = CVfolds,
-                               selMetrics      = selMetrics,
-                               params          = params,
-                               p               = p,
-                               nCores          = nCores)$opt.path %>%
-      as.data.frame()
+      tunedModel <- calibrate_DT(trainingData   = trainingData,
+                                 CVfolds        = CVfolds,
+                                 selMetrics     = selMetrics,
+                                 params         = params,
+                                 p              = p,
+                                 nCores         = nCores)
+      bestParams <- tunedModel$opt.path %>%
+        as.data.frame() %>%
+        dplyr::select(num.trees, mtry, sample.fraction,
+                      min.node.size, auc.test.mean, timeboth.test.mean)
 
-    print(bestParams[, c("num.trees", "mtry",
-                         "sample.fraction", "min.node.size",
-                         "auc.test.mean", "timeboth.test.mean")])
+      suppressWarnings(utils::write.table(bestParams,
+                                          file = paste0(pathDT, "log.csv"),
+                                          sep = ";", append = TRUE,
+                                          row.names = FALSE))
 
-    auc.test.mean <- timeboth.test.mean <- auc.diff <- time.diff <- weight <- NULL
-    bestParams <- dplyr::mutate(bestParams,
-                                auc = auc.test.mean,
-                                time = timeboth.test.mean) %>%
-      dplyr::mutate(auc_diff = (max(auc) - auc) / (1 - min(auc)),
-                    time_diff = (time - min(time)) / (max(time) - min(time))) %>%
-      dplyr::mutate(weight = 2/3 * auc_diff + 1/3 * time_diff) %>%
-      dplyr::filter(weight == min(weight)) %>%
-      dplyr::mutate(num.trees = as.character(num.trees) %>%
-                      as.numeric(),
-                    mtry = as.character(mtry) %>%
-                      as.numeric(),
-                    sample.fraction = as.character(sample.fraction) %>%
-                      as.numeric(),
-                    min.node.size = as.character(min.node.size) %>%
-                      as.numeric()
-                    )
+      auc.test.mean <- timeboth.test.mean <-
+        auc.diff <- time.diff <- weight <- NULL
 
-    cat("\n        selected parameter values:\n")
+      bestParams <- dplyr::mutate(bestParams,
+                                  AUC = auc.test.mean,
+                                  ellapsedTime = timeboth.test.mean) %>%
+        dplyr::mutate(auc_diff = (max(AUC) - AUC) / (1 - min(AUC)),
+                      time_diff = (ellapsedTime - min(ellapsedTime)) /
+                        (max(ellapsedTime) - min(ellapsedTime))) %>%
+        dplyr::mutate(weight = 2/3 * auc_diff + 1/3 * time_diff) %>%
+        dplyr::filter(weight == min(weight)) %>%
+        dplyr::mutate(num.trees = as.character(num.trees) %>%
+                        as.numeric(),
+                      mtry = as.character(mtry) %>%
+                        as.numeric(),
+                      sample.fraction = as.character(sample.fraction) %>%
+                        as.numeric(),
+                      min.node.size = as.character(min.node.size) %>%
+                        as.numeric()
+        )
 
-    print(bestParams[, c("num.trees", "mtry",
-                         "sample.fraction", "min.node.size",
-                         "auc.test.mean", "timeboth.test.mean")])
+    } else {
+      bestParams <- do.call(what = "cbind", args = params) %>%
+        data.frame()
+    }
 
-    calibratedRF <-
-      ranger::ranger(data            = trainingData,
-                     formula         = pressure ~ .,
-                     replace         = FALSE,
-                     mtry            = bestParams$mtry,
-                     num.trees       = bestParams$num.trees,
-                     min.node.size   = bestParams$min.node.size,
-                     sample.fraction = bestParams$sample.fraction,
-                     importance      = 'impurity',
-                     write.forest    = FALSE,
-                     probability     = TRUE,
-                     case.weights    = (1 - table(trainingData$pressure) /
-                                          nrow(trainingData))[trainingData$pressure],
-                     num.threads     = nCores
-      )
+    cat("\n    best parameter values:\n")
+    cat("\n    best parameter values:\n",
+        file = paste0(pathDT, "log.csv"), append = TRUE)
 
-    cat("\n    metric selection...\n")
+    bestParams <- dplyr::select(bestParams,
+                                num.trees, mtry, sample.fraction,
+                                min.node.size, AUC, ellapsedTime)
 
-    selMetrics <-
-      names(calibratedRF$variable.importance)[calibratedRF$variable.importance > 0]
+    print(bestParams)
+    suppressWarnings(utils::write.table(bestParams,
+                                        file = paste0(pathDT, "log.csv"),
+          sep = ";", append = TRUE, row.names = FALSE))
 
-    DTunit <- list()
+    learner <- mlr::makeLearner(cl           = "classif.ranger",
+                                predict.type = "prob",
+                                num.threads  = nCores,
+                                replace      = FALSE)
 
-    DTunit$rf <-
-      ranger::ranger(data            = trainingData[, c("pressure", selMetrics)],
-                     formula         = pressure ~ .,
-                     replace         = FALSE,
-                     mtry            = bestParams$mtry,
-                     num.trees       = bestParams$num.trees,
-                     min.node.size   = bestParams$min.node.size,
-                     sample.fraction = bestParams$sample.fraction,
-                     importance      = 'impurity',
-                     write.forest    = TRUE,
-                     probability     = TRUE,
-                     case.weights    = (1 - table(trainingData$pressure) /
-                                          nrow(trainingData))[trainingData$pressure],
-                     num.threads     = nCores)
+    task <- mlr::makeClassifTask(data     = trainingData[, c("pressure",
+                                                             selMetrics)],
+                                 target   = "pressure",
+                                 positive = "impaired")
 
-
-    DTunit$auc <- bestParams$auc
+    DTunit <- mlr::bootstrapB632(learner         = learner,
+                                 num.trees       = bestParams$num.trees,
+                                 mtry            = bestParams$mtry,
+                                 sample.fraction = bestParams$sample.fraction,
+                                 min.node.size   = bestParams$min.node.size,
+                                 task      = task,
+                                 iters     = nIter,
+                                 stratify  = TRUE,
+                                 models    = TRUE,
+                                 keep.pred = TRUE,
+                                 measures  = list(mlr::auc, mlr::timeboth),
+                                 show.info = FALSE)
 
         save(DTunit, trainingData,
              file = file.path(pathDT, paste0("model_", p, ".rda")))
    }
-}
-
-
-#' @import ranger
-#' @export
-predict_DT <- function(object,
-                       newdata) {
-
-    IP <- stats::predict(object      = object$rf,
-                         data        = newdata,
-                         predict.all = FALSE)$predictions[, "impaired"]
 }

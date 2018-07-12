@@ -1,4 +1,31 @@
-#' code adapted from https://github.com/ricardo-bion/ggradar/blob/master/R/ggradar.R
+#' Plot the predictions of a DT model
+#'
+#' This function is a wrapper around the
+#' [ggradar](https://github.com/ricardo-bion/ggradar/blob/master/R/ggradar.R)
+#' function.
+#'
+#' @param plot.data dataframe comprising samples in rows and DT model
+#'   predictions in columns (as returned by [run_DT][run_DT])
+#' @param axis.labels names of axis labels if other than column names supplied
+#'   via plot.data
+#' @param grid.line.width,gridline.min.colour,gridline.mid.colour,gridline.max.colour
+#'   controls for the appearance of some aspects the 'minimum', 'average' and
+#'   'maximum' grid lines.
+#' @param axis.label.offset vertical displacement of axis labels from maximum
+#'   grid line, measured relative to circle diameter
+#' @param axis.line.colour colour of the axes
+#' @param axis.label.size,grid.label.size,legend.text.size text size
+#' @param group.line.width,group.point.size controls for the appearance of some
+#'   aspects of the sample lines
+#' @param background.circle.colour,background.circle.transparency controls for
+#'   the appearance of background circle
+#' @param plot.legend logical, does the legend be printed or not
+#' @param legend.title,plot.title titles
+#' @param byRow logical, should one radar plot be returned for each sample ID
+#'
+#'
+#' @references script adapted from
+#'   https://github.com/ricardo-bion/ggradar/blob/master/R/ggradar.R
 #'
 #' @importFrom dplyr "%>%"
 #' @export
@@ -21,6 +48,8 @@ plot_DT <- function(plot.data,
                     plot.title            = "",
                     legend.text.size      = grid.label.size,
                     byRow                 = FALSE) {
+
+  ID <- x <- y <- text <- axis.no <- NULL
 
 
   if (byRow) {
@@ -75,10 +104,11 @@ plot_DT <- function(plot.data,
     names(plot.data)[1] <- "group"
 
     var.names <- colnames(plot.data)[-1]  #'Short version of variable names
-    #axis.labels [if supplied] is designed to hold 'long version' of variable names
-    #with line-breaks indicated using \n
+    #axis.labels [if supplied] is designed to hold 'long version' of variable
+    #names with line-breaks indicated using \n
 
-    #caclulate total plot extent as radius of outer circle x a user-specifiable scaling factor
+    #caclulate total plot extent as radius of outer circle x a user-specifiable
+    #scaling factor
     plot.extent.x <- (grid.max + abs(centre.y))*plot.extent.x.sf
     plot.extent.y <- (grid.max + abs(centre.y))*plot.extent.y.sf
 
@@ -97,7 +127,8 @@ plot_DT <- function(plot.data,
       #http://stackoverflow.com/questions/9614433/creating-radar-chart-a-k-a-star-plot-spider-plot-using-ggplot2-in-r
       #Args:
       #  df: Col 1 -  group ('unique' cluster / group ID of entity)
-      #      Col 2-n:  v1.value to vn.value - values (e.g. group/cluser mean or median) of variables v1 to v.n
+      #      Col 2-n:  v1.value to vn.value - values (e.g. group/cluser mean or
+      #      median) of variables v1 to v.n
 
       path <- as.factor(df[,1])
 
@@ -125,17 +156,21 @@ plot_DT <- function(plot.data,
                                       y     = pathData[,2]*cos(angles[1])))
 
       }
-      #Make sure that name of first column matches that of input data (in case !="group")
+      #Make sure that name of first column matches that of input data (in case
+      #!="group")
       colnames(graphData)[1] <- colnames(df)[1]
       graphData #data frame returned by function
     }
 
     CaclulateAxisPath <- function(var.names,min,max) {
-      #Caculates x-y coordinates for a set of radial axes (one per variable being plotted in radar plot)
+      #Caculates x-y coordinates for a set of radial axes (one per variable
+      #being plotted in radar plot)
       #Args:
       #var.names - list of variables to be plotted on radar plot
-      #min - MININUM value required for the plotted axes (same value will be applied to all axes)
-      #max - MAXIMUM value required for the plotted axes (same value will be applied to all axes)
+      #min - MININUM value required for the plotted axes (same value will be
+      #applied to all axes)
+      #max - MAXIMUM value required for the plotted axes (same value will be
+      #applied to all axes)
       #var.names <- c("v1","v2","v3","v4","v5")
       n.vars <- length(var.names) # number of vars (axes) required
       #Cacluate required number of angles (in radians)
@@ -152,7 +187,8 @@ plot_DT <- function(plot.data,
         b <- c(i,max.x[i],max.y[i])
         axisData <- rbind(axisData, a, b)
       }
-      #Add column names + set row names = row no. to allow conversion into a data frame
+      #Add column names + set row names = row no. to allow conversion into a
+      #data frame
       colnames(axisData) <- c("axis.no","x","y")
       rownames(axisData) <- seq(1:nrow(axisData))
       #Return calculated axis paths
@@ -160,7 +196,8 @@ plot_DT <- function(plot.data,
     }
 
     funcCircleCoords <- function(center = c(0,0), r = 1, npoints = 100){
-      #Adapted from Joran's response to http://stackoverflow.com/questions/6862742/draw-a-circle-with-ggplot2
+      #Adapted from Joran's response to
+      #http://stackoverflow.com/questions/6862742/draw-a-circle-with-ggplot2
       tt <- seq(0,2*pi,length.out = npoints)
       xx <- center[1] + r * cos(tt)
       yy <- center[2] + r * sin(tt)
@@ -168,9 +205,8 @@ plot_DT <- function(plot.data,
     }
 
     ### Convert supplied data into plottable format
-    # (a) add abs(centre.y) to supplied plot data
-    #[creates plot centroid of 0,0 for internal use, regardless of min. value of y
-    # in user-supplied data]
+    #(a) add abs(centre.y) to supplied plot data [creates plot centroid of 0,0
+    #for internal use, regardless of min. value of y in user-supplied data]
     plot.data.offset <- plot.data
     plot.data.offset[,2:ncol(plot.data.offset)] <-
       plot.data[,2:ncol(plot.data)] + abs(centre.y)
@@ -208,7 +244,8 @@ plot_DT <- function(plot.data,
                            })
     #print(axis$label)
     # (e) Create Circular grid-lines + labels
-    #caclulate the coordinates required to plot circular grid-lines for three user-specified
+    #caclulate the coordinates required to plot circular grid-lines for three
+    #user-specified
     #y-axis values: min, mid and max [grid.min; grid.mid; grid.max]
     gridline <- NULL
     gridline$min$path <- funcCircleCoords(c(0,0),
@@ -252,12 +289,13 @@ plot_DT <- function(plot.data,
     #Base-layer = axis labels + plot extent
     # [need to declare plot extent as well, since the axis labels don't always
     # fit within the plot area automatically calculated by ggplot, even if all
-    # included in first plot; and in any case the strategy followed here is to first
-    # plot right-justified labels for axis labels to left of Y axis for x< (-x.centre.range)],
-    # then centred labels for axis labels almost immediately above/below x= 0
-    # [abs(x) < x.centre.range]; then left-justified axis labels to right of Y axis [x>0].
-    # This building up the plot in layers doesn't allow ggplot to correctly
-    # identify plot extent when plotting first (base) layer]
+    # included in first plot; and in any case the strategy followed here is to
+    # first plot right-justified labels for axis labels to left of Y axis for x<
+    # (-x.centre.range)], then centred labels for axis labels almost immediately
+    # above/below x= 0 [abs(x) < x.centre.range]; then left-justified axis
+    # labels to right of Y axis [x>0]. This building up the plot in layers
+    # doesn't allow ggplot to correctly identify plot extent when plotting first
+    # (base) layer]
 
     #base layer = axis labels for axes to left of central y-axis [x< -(x.centre.range)]
     base <- ggplot2::ggplot(axis$label)                             +
