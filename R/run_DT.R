@@ -10,9 +10,6 @@
 #'
 #' @inheritParams build_DT
 #'
-#' @param newdata a data frame with samples in rows and biological metrics in
-#'   columns
-#'
 #' @return a data frame with the samples from `newdata` in rows and the
 #'   corresponding predictions for the different pressures included in the DT
 #'   model in columns.
@@ -21,7 +18,7 @@
 #'
 #' @importFrom dplyr "%>%"
 #' @export
-run_DT <- function(pathDT, newdata) {
+run_DT <- function(pathDT, metrics) {
   . <- NULL
   modelList <- list.files(path       = pathDT,
                           pattern    = "model_*",
@@ -40,11 +37,11 @@ run_DT <- function(pathDT, newdata) {
                     DTunit <- NULL
                     load(modelList[i])
                     predict_DT(object      = DTunit,
-                               newdata     = newdata,
+                               newdata     = metrics,
                                pred.all    = FALSE)
                     })    %>%
     do.call(what = cbind) %>%
-    data.frame(ID = rownames(newdata), .)
+    data.frame(ID = rownames(metrics), .)
 
   colnames(preds) <- c("ID", pressureList)
 
