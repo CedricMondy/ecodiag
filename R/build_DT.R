@@ -64,14 +64,14 @@
 #' @export
 build_DT <- function(metrics,
                      pressures,
+                     low          = "low",
+                     impaired     = "impaired",
                      pathDT,
                      params    = list(num.trees       = 500,
                                       mtry            = 25,
                                       sample.fraction = 0.632,
                                       min.node.size   = 25),
                      CVfolds      = 5,
-                     low          = "low",
-                     impaired     = "impaired",
                      nIter        = 1L,
                      nCores       = 1L) {
 
