@@ -25,8 +25,8 @@
 #' @importFrom dplyr "%>%"
 #' @export
 calculate_DT_performance <- function(pathDT,
-                                     pressures,
                                      metrics,
+                                     pressures,
                                      low       = "low",
                                      impaired  = "impaired",
                                      smoothROC = TRUE) {
