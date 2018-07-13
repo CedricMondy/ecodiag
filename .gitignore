@@ -4,3 +4,6 @@
 .Ruserdata
 *.Rproj
 temp/*
+inst/doc
+vignettes/models
+*.bib
