@@ -1,0 +1,238 @@
+---
+title: "ecodiag workflow"
+author: "Cédric Mondy"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+bibliography: references.bib
+vignette: >
+  %\VignetteIndexEntry{ecodiag Workflow}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  eval     = FALSE
+)
+```
+
+## Introduction 
+The `ecodiag` package allows to build ecological Diagnostic Tools (DT) in a standardized way. A DT corresponds to a set of random forest models (built using the `ranger` and `mlr` packages) designed to predict the probability of an ecological community being impacted by different driving factors (one model per driving factor). 
+
+The idea is to use community descriptors (taxa abundances or biological metrics synthesizing specific features of communities) to give insights in the environmental conditions it encountered. The ability of random forests to handle non-linear and complex interactions among explicative variables makes these algorithms useful to explore which combinations of biological features would be indicative of given environmental conditions. 
+
+The application of this idea was first tested with macroinvertebrates [@mondy_using_2013] and later with diatoms [@larras_assessing_2017]. The goal of the `ecodiag` package is to provide a standardized framework to develop such diagnostic tools using only two input tables: one with the biological features that will be treated as explicative variables and one with different environmental characteristics that one suppose to act as drivers on the community of interest.
+
+The package is composed of four functions, each dedicated to a step of the process of building/calibrating, evaluating, using and visualizing a DT model.
+
+## Workflow
+### Data
+The data required to build a DT model using `ecodiag` are a `metrics` and a `pressures` tables. The `metrics` table contains biological features of evaluated communities whereas the `pressures` table contains the environmental conditions that we want to assess. The `pressures` table thus contains the same rows (i.e. observations) as the `metrics` table and one column per environmental condition of interest (later refered as 'driver').
+
+A DT unit (i.e. a model designed for one specific driver) is a binary classification model. Therefore, the drivers have to expressed in a discretized way. If several classes are used to describe the driver, we will group them into two contrasted classes (e.g. `low` impact conditions and `impaired` conditions).
+
+If the data available are large enough, it is advised to split them in a learning and a test data sets.
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ecodiag)
+```
+
+```{r import-packages, eval=FALSE}
+library(tidyverse)
+library(ecodiag)
+```
+
+
+```{r import-data}
+# Import the data
+data(metrics)
+data(pressures)
+
+# Define a learning and a test data sets
+learning_set <- sample(x       = seq(nrow(metrics)),
+                       size    = round(0.632 * nrow(metrics)),
+                       replace = FALSE)
+
+test_set <- setdiff(x = seq(nrow(metrics)), y = learning_set)
+
+learning_metrics   <- metrics[learning_set, ]
+learning_pressures <- pressures[learning_set, ]
+
+test_metrics   <- metrics[test_set, ]
+test_pressures <- pressures[test_set, ]
+```
+
+### Building a DT model: `build_DT`
+The first step is to build the DT model using the learning data set. The used random forest algorithm accepts several meta-parameters that can influence its performances: the number of individual trees making up the random forest (`num.trees`), the number of biological features to be tested at each node of the trees (`mtry`), the proportion of the learning data used randomly sampled in order to build each individual tree (`sample.fraction`) and the minimum number of observations to include in a terminal node (`min.node.size`). These parameters are passed as a named list to `build_DT`.
+
+The `build_DT` function returns no objects to R but instead write the built models to the location indicated by the `pathDT` argument.
+
+In order to have more robust predictions, we can build several random forests for each DT unit and the global prediction will be the average of the individual predictions. The use of several *iterations* of the model can also be used to evaluate the structural variability of the DT unit. The numer of iterations is set using the `nIter` argument.
+
+```{r no-calibration, eval=FALSE}
+build_DT(metrics   = learning_metrics, 
+         pressures = learning_pressures,
+         low       = c("high", "good"),
+         impaired  = c("moderate", "poor", "bad"),
+         pathDT    = "models/",
+         params    = list(num.trees       = 500,
+                          mtry            = 25, 
+                          sample.fraction = 0.632, 
+                          min.node.size   = 25),
+         nIter     = 4
+         )
+```
+
+#### Building and calibrating a DT model
+Random forests, and machine learning algorithms in general, can overfit the training data. Therefore, if we want to use the DT model to predict driver probability of occurence on new data, we should minimize this overfitting. In order to do so, we implemented the ability to test different combinations of the random forest meta-parameters using a cross-validation (CV) procedure. This procedure compare the CV performances between the different combinations of meta-parameter values using the `mlr` package.
+
+```{r calibration, eval=FALSE}
+build_DT(metrics   = learning_metrics,
+         pressures = learning_pressures,
+         low       = c("high", "good"),
+         impaired  = c("moderate", "poor", "bad"),
+         pathDT    = "calibrated_models/",
+         params    = list(
+           num.trees       = c(500, 750, 1000, 1500),
+           mtry            = c(5, 10, 25, 50),
+           sample.fraction = 0.632,
+           min.node.size   = 25),
+         CVfolds   = 5
+         )
+```
+
+When building the DT model, a log file is also created in the `pathDT` directory. This log contains the best meta-parameter values, i.e. the `params` values selected to build each of the DT units. If no calibration was performed, then the `params` values are returned.
+
+#### Parallelizing the calculations
+In order to speed up the building and calibration procedure, we took profit of the implementation of parallel computing in the `mlr` package. In this case, we just have to set the argument `nCores` to a value larger than 1 in the call of the function `build_DT`.
+
+```{r iterations-no-calibration}
+build_DT(metrics   = learning_metrics, 
+         pressures = learning_pressures,
+         low       = c("high", "good"),
+         impaired  = c("moderate", "poor", "bad"),
+         pathDT    = "models/",
+         params    = list(num.trees       = 500,
+                          mtry            = 25, 
+                          sample.fraction = 0.632, 
+                          min.node.size   = 25),
+         nIter     = 4,
+         nCores    = 4
+         )
+```
+
+### Evaluating the DT model performances: `calculate_DT_performance`
+The DT models generated with the `build_DT` function are binary classification models. To evaluate their performances, we chose to use the criteria Area Under the Curve (AUC) calculated with the `roc` package. This AUC criteria is a numeric value between 0 and 1 with values close to 0.5 indicating a random model and values above 0.7 indicating models with decent performances [@pearce_evaluating_2000].
+
+The function `calculate_DT_performance` calculates the ROC curves (smoothed or not depending on argument `smoothROC`) and the corresponding Area Under the Curve (AUC) for each of the DT models using (i) the training data set stored in the models and (ii) a test data set (provided using `pressures` and `metrics`).
+
+```{r evaluation}
+modelPerformances <- 
+  calculate_DT_performance(pathDT    = "models/",
+                           metrics   = test_metrics,
+                           pressures = test_pressures,
+                           low       = c("high", "good"),
+                           impaired  = c("moderate", "poor", "bad"),
+                           smoothROC = TRUE
+                           )
+```
+
+```{r AUC-table}
+modelPerformances$AUC
+```
+
+The following function (taken from the [cookbook-r](http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/)) allows to place several ggplots in the same page.
+```{r multiplot}
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+```{r ROC, fig.width=7, fig.height=4}
+multiplot(plotlist = modelPerformances$ROC, cols = 2)
+```
+
+### Running the DT model
+To predict the driver probability of occurence based on new biological data, we use the `run_DT` function that takes as arguments the `pathDT` indicating the directory where the models have been saved and a `metrics` table containing the biological features of the new communities.
+
+```{r run-DT}
+predictions <- run_DT(pathDT  = "models/",
+                      metrics = as.data.frame(test_metrics))
+```
+
+```{r}
+as.tbl(predictions)
+```
+
+### Ploting DT predictions
+A convenient way to visually represent a DT model predictions is to use radar plots, the `plot_DT` function performs this task.
+
+We can represent all the observations on a single radar plot (e.g. same site with different dates or upstream-downstream gradient).
+
+```{r plot-DT, fig.width=7}
+plot_DT(plot.data        = head(predictions), 
+        plot.title       = "test DT model", 
+        axis.label.size  = 3, 
+        grid.label.size  = 6,
+        legend.title     = "observations",
+        legend.text.size = 12,
+        )
+```
+
+A second option is to represent each observation (row) by its own radar plot setting the argument `byRow` to TRUE.
+
+```{r, fig.width=7}
+plot_DT(plot.data        = head(predictions), 
+        axis.label.size  = 3, 
+        grid.label.size  = 6,
+        byRow            = TRUE) 
+
+```
+
+
+## References

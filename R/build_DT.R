@@ -64,14 +64,14 @@
 #' @export
 build_DT <- function(metrics,
                      pressures,
+                     low          = "low",
+                     impaired     = "impaired",
                      pathDT,
                      params    = list(num.trees       = 500,
                                       mtry            = 25,
                                       sample.fraction = 0.632,
                                       min.node.size   = 25),
                      CVfolds      = 5,
-                     low          = "low",
-                     impaired     = "impaired",
                      nIter        = 1L,
                      nCores       = 1L) {
 
@@ -90,8 +90,8 @@ build_DT <- function(metrics,
   cat("Building DT", file = paste0(pathDT, "log.csv"))
 
    for (p in colnames(pressures)) {
-    cat("\n", p, ":\n", sep = "")
-     cat("\n", p, ":\n", sep = "",
+    cat("\n", p, "\n", sep = "")
+     cat("\n", p, "\n", sep = "",
          file = paste0(pathDT, "log.csv"), append = TRUE)
 
      pressure <- NULL
@@ -159,18 +159,17 @@ build_DT <- function(metrics,
 
     } else {
       bestParams <- do.call(what = "cbind", args = params) %>%
-        data.frame()
+        data.frame() %>%
+        dplyr::mutate(AUC = NA, ellapsedTime = NA)
     }
 
-    cat("\n    best parameter values:\n")
-    cat("\n    best parameter values:\n",
+    cat("\n    best parameter values\n",
         file = paste0(pathDT, "log.csv"), append = TRUE)
 
     bestParams <- dplyr::select(bestParams,
                                 num.trees, mtry, sample.fraction,
                                 min.node.size, AUC, ellapsedTime)
 
-    print(bestParams)
     suppressWarnings(utils::write.table(bestParams,
                                         file = paste0(pathDT, "log.csv"),
           sep = ";", append = TRUE, row.names = FALSE))
@@ -200,5 +199,7 @@ build_DT <- function(metrics,
 
         save(DTunit, trainingData,
              file = file.path(pathDT, paste0("model_", p, ".rda")))
+
+        cat("    DONE")
    }
 }

@@ -380,8 +380,7 @@ plot_DT <- function(plot.data,
                                            "#FFAA91", "#B4A76C",
                                            "#9CA299", "#565A5C",
                                            "#00A04B", "#E54C20"),
-                                         100))                      +
-      ggplot2::theme(legend.title = ggplot2::element_blank())
+                                         100))
 
     if (!plot.legend) {
       base <- base +

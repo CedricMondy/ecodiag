@@ -4,18 +4,18 @@
 \alias{calculate_DT_performance}
 \title{Calculate the performances of a DT}
 \usage{
-calculate_DT_performance(pathDT, pressures, metrics, low = "low",
+calculate_DT_performance(pathDT, metrics, pressures, low = "low",
   impaired = "impaired", smoothROC = TRUE)
 }
 \arguments{
 \item{pathDT}{character string, the path where the built models will be saved}
 
+\item{metrics}{a data frame with samples in rows and biological metrics in
+columns}
+
 \item{pressures}{a data frame with samples in rows and pressure information
 in columns (one per pressure category). The table is filled with quality
 classes (e.g. low or impaired)}
-
-\item{metrics}{a data frame with samples in rows and biological metrics in
-columns}
 
 \item{low}{character vectors with the labels of the pressure
 classes (in \code{pressures}) corresponding to low impact and impaired

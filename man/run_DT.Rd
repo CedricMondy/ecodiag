@@ -4,12 +4,12 @@
 \alias{run_DT}
 \title{Run a Diagnostic Tool}
 \usage{
-run_DT(pathDT, newdata)
+run_DT(pathDT, metrics)
 }
 \arguments{
 \item{pathDT}{character string, the path where the built models will be saved}
 
-\item{newdata}{a data frame with samples in rows and biological metrics in
+\item{metrics}{a data frame with samples in rows and biological metrics in
 columns}
 }
 \value{
