@@ -8,11 +8,11 @@ plot_DT(plot.data, axis.labels = colnames(plot.data)[-1],
   grid.line.width = 0.5, gridline.min.colour = "grey",
   gridline.mid.colour = "#007A87", gridline.max.colour = "grey",
   grid.label.size = 7, axis.label.offset = 1.15, axis.label.size = 8,
-  axis.line.colour = "grey", group.line.width = 1.5, group.point.size = 6,
-  background.circle.colour = "#D7D6D1",
-  background.circle.transparency = 0.2, plot.legend = if (nrow(plot.data) >
-  1) TRUE else FALSE, legend.title = "", plot.title = "",
-  legend.text.size = grid.label.size, byRow = FALSE)
+  axis.line.colour = "grey", group.line.width = 1.5,
+  group.point.size = 6, background.circle.colour = "#D7D6D1",
+  background.circle.transparency = 0.2, plot.legend = if
+  (nrow(plot.data) > 1) TRUE else FALSE, legend.title = "",
+  plot.title = "", legend.text.size = grid.label.size, byRow = FALSE)
 }
 \arguments{
 \item{plot.data}{dataframe comprising samples in rows and DT model
