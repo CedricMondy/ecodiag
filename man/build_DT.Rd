@@ -4,9 +4,9 @@
 \alias{build_DT}
 \title{Build ecological Diagnostic Tool}
 \usage{
-build_DT(metrics, pressures, low = "low", impaired = "impaired", pathDT,
-  params = list(num.trees = 500, mtry = 25, sample.fraction = 0.632,
-  min.node.size = 25), CVfolds = 5, nIter = 1L, nCores = 1L)
+build_DT(metrics, pressures, low = "low", impaired = "impaired",
+  pathDT, params = list(num.trees = 500, mtry = 25, sample.fraction =
+  0.632, min.node.size = 25), CVfolds = 5, nIter = 1L, nCores = 1L)
 }
 \arguments{
 \item{metrics}{a data frame with samples in rows and biological metrics in

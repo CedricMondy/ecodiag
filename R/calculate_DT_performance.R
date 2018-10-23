@@ -37,10 +37,11 @@ calculate_DT_performance <- function(pathDT,
                           pattern    = "model_*",
                           full.names = TRUE)
 
-  pressureList <- gsub(modelList,
-                       pattern     = paste0(pathDT,
-                                            "model_"),
-                       replacement = "") %>%
+  pressureList <- list.files(path       = pathDT,
+                             pattern    = "model_*",
+                             full.names = FALSE) %>%
+    gsub(., pattern     = "model_",
+         replacement = "") %>%
     gsub(pattern     = ".rda",
          replacement = "")
 

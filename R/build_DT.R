@@ -127,7 +127,7 @@ build_DT <- function(metrics,
                                  p              = p,
                                  nCores         = nCores)
       bestParams <- tunedModel$opt.path %>%
-        as.data.frame() %>%
+        as.data.frame()                 %>%
         dplyr::select(num.trees, mtry, sample.fraction,
                       min.node.size, auc.test.mean, timeboth.test.mean)
 
@@ -197,7 +197,7 @@ build_DT <- function(metrics,
                                  measures  = list(mlr::auc, mlr::timeboth),
                                  show.info = FALSE)
 
-        save(DTunit, trainingData,
+        save(DTunit, trainingData, task,
              file = file.path(pathDT, paste0("model_", p, ".rda")))
 
         cat("    DONE")
