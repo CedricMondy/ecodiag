@@ -2,7 +2,10 @@
 
 export(build_DT)
 export(calculate_DT_performance)
+export(estimate_partial_dependence)
+export(estimate_variable_importance)
 export(plot_DT)
 export(run_DT)
 import(mlr)
+import(mmpf)
 importFrom(dplyr,"%>%")
