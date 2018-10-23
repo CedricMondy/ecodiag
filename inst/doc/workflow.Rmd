@@ -14,8 +14,27 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment  = "#>",
-  eval     = FALSE
+  eval     = TRUE
 )
+
+knitr::knit_hooks$set(
+   error = function(x, options) {
+     paste('\n\n
+
+', sep = '\n')
+   },
+   warning = function(x, options) {
+     paste('\n\n
+
+', sep = '\n')
+   },
+   message = function(x, options) {
+     paste('\n\n
+
+', sep = '\n')
+   }
+)
+
 ```
 
 ## Introduction 
@@ -25,7 +44,7 @@ The idea is to use community descriptors (taxa abundances or biological metrics 
 
 The application of this idea was first tested with macroinvertebrates [@mondy_using_2013] and later with diatoms [@larras_assessing_2017]. The goal of the `ecodiag` package is to provide a standardized framework to develop such diagnostic tools using only two input tables: one with the biological features that will be treated as explicative variables and one with different environmental characteristics that one suppose to act as drivers on the community of interest.
 
-The package is composed of four functions, each dedicated to a step of the process of building/calibrating, evaluating, using and visualizing a DT model.
+The package is composed of six functions, each dedicated to a step of the process of building/calibrating, evaluating, using and visualizing a DT model.
 
 ## Workflow
 ### Data
@@ -68,9 +87,9 @@ test_pressures <- pressures[test_set, ]
 ### Building a DT model: `build_DT`
 The first step is to build the DT model using the learning data set. The used random forest algorithm accepts several meta-parameters that can influence its performances: the number of individual trees making up the random forest (`num.trees`), the number of biological features to be tested at each node of the trees (`mtry`), the proportion of the learning data used randomly sampled in order to build each individual tree (`sample.fraction`) and the minimum number of observations to include in a terminal node (`min.node.size`). These parameters are passed as a named list to `build_DT`.
 
-The `build_DT` function returns no objects to R but instead write the built models to the location indicated by the `pathDT` argument.
+The `build_DT` function returns no objects to R but instead writes the built models to the location indicated by the `pathDT` argument.
 
-In order to have more robust predictions, we can build several random forests for each DT unit and the global prediction will be the average of the individual predictions. The use of several *iterations* of the model can also be used to evaluate the structural variability of the DT unit. The numer of iterations is set using the `nIter` argument.
+In order to have more robust predictions, we can build several random forests for each DT unit and the global prediction will be the average of the individual predictions. The use of several *iterations* of the model can also be used to evaluate the structural variability of the DT unit. The number of iterations is set using the `nIter` argument.
 
 ```{r no-calibration, eval=FALSE}
 build_DT(metrics   = learning_metrics, 
@@ -197,6 +216,48 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 multiplot(plotlist = modelPerformances$ROC, cols = 2)
 ```
 
+### Evaluating the importance of the variables
+In order to better understand the biological mechanisms underlying the diagnostic tool predictions, it could be interesting to identify (i) which biological variables are the most important, i.e. which ones influences the most the model predictions and (ii) what is the shape of the relationship between variable values and model predictions. 
+
+To evaluate the importance of the different biological variables in the model outcomes, we use the function `estimate_variable_importance` that takes as arguments `modelPath` indicating the path of the RData object where the DTunit corresponding to a given pressure is saved, `methods` specifying one or several methods used to assess variable importance, `nVarToPlot` specifying the number of the most important variables to graphically represent, `nIter` and `nCores` allow to specify the number of iterations and the number of CPUs to run these iterations, respectively, for the importance measures specific to ranger models (`ranger.impurity` and `ranger.permutation`).
+
+```{r evaluate_importance}
+importance <- estimate_variable_importance(
+  modelPath = "models/model_PESTICIDES.rda",
+  methods   = c("anova.test", "auc", "chi.squared", "gain.ratio",
+                "information.gain", "kruskal.test", "ranger.impurity",
+                "ranger.permutation"),
+  nVarToPlot = 10,
+  nIter      = 8,
+  nCores     = 4)
+```
+
+```{r}
+importance$varImp
+```
+
+```{r, fig.height=7, fig.width=7}
+importance$varImpPlot
+```
+
+### Evaluating the marginal effect of variables on model predictions
+The shape of the relationship between variable values and model predictions can be estimated using sensitivity (or partial dependence) analyses. In `ecodiag`, this is performed using the function `estimate_partial_dependence`. This function performs the sensitivity analysis by setting all variables but the one of interest to their mean values whereas the values of the variable of interest are chosen to cover the range over which they are observed in the training data set. This function takes two arguments: the `modelPath` and the `variables` of interest. Only main effects are investigated, not the interactions among variables.
+
+```{r}
+partialDependence <- estimate_partial_dependence(
+  modelPath = "models/model_PESTICIDES.rda",
+  variables = c("SPEAR_SENSIBILITE_MAX", "CSI_LOCOMOTION",
+                "GROUPE_ECO_A_S", "GROUPE_ECO_A_Q"))
+```
+
+```{r}
+as.tbl(partialDependence$data)
+```
+
+```{r, fig.width=7, fig.height=7}
+partialDependence$plot
+```
+
 ### Running the DT model
 To predict the driver probability of occurence based on new biological data, we use the `run_DT` function that takes as arguments the `pathDT` indicating the directory where the models have been saved and a `metrics` table containing the biological features of the new communities.
 
@@ -220,7 +281,7 @@ plot_DT(plot.data        = head(predictions),
         axis.label.size  = 3, 
         grid.label.size  = 6,
         legend.title     = "observations",
-        legend.text.size = 12,
+        legend.text.size = 12
         )
 ```
 
