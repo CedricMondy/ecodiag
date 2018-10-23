@@ -3,7 +3,13 @@
 
 # ecodiag
 
-The goal of ecodiag is to …
+The `ecodiag` package allows to build ecological Diagnostic Tools (DT)
+in a standardized way. A DT corresponds to a set of random forest models
+(built using the `ranger` and `mlr` packages) designed to predict the
+probability of an ecological community being impacted by different
+driving factors (one model per driving factor).
+
+Still in development.
 
 ## Installation
 
@@ -16,8 +22,4 @@ devtools::install_github("CedricMondy/ecodiag")
 
 ## Example
 
-This is a basic example which shows you how to solve a common problem:
-
-``` r
-## basic example code
-```
+For examples, see the vignette `workflow`.
