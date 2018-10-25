@@ -6,7 +6,8 @@
 \usage{
 build_DT(metrics, pressures, low = "low", impaired = "impaired",
   pathDT, params = list(num.trees = 500, mtry = 25, sample.fraction =
-  0.632, min.node.size = 25), CVfolds = 5, nIter = 1L, nCores = 1L)
+  0.632, min.node.size = 25), CVfolds = 5, nIter = 1L, nCores = 1L,
+  trainingFrac = 1, samplingUnit = NULL, samplingSeed = 20181025)
 }
 \arguments{
 \item{metrics}{a data frame with samples in rows and biological metrics in
@@ -31,12 +32,18 @@ situations, respectively.}
 \item{CVfolds}{an integer indicating the number of parts made from the
 training data set and used to calibrate the model hyper-parameters.}
 
-\item{nIter}{integer indicating the number of ranger RF models created for
+\item{nIter}{an integer indicating the number of ranger RF models created for
 each pressure type. nIter larger than 1 allow to estimate prediction
 uncertainty and improve model robustness.}
 
 \item{nCores}{an integer indicating the number of CPU cores available to
 parallelize the calibration step}
+
+\item{trainingFrac}{}
+
+\item{samplingUnit}{}
+
+\item{samplingSeed}{}
 }
 \value{
 nothing, the models and used data are saved as .rda objects in the

@@ -48,12 +48,18 @@
 #'   classes (in `pressures`) corresponding to low impact and impaired
 #'   situations, respectively.
 #'
-#' @param nIter integer indicating the number of ranger RF models created for
+#' @param nIter an integer indicating the number of ranger RF models created for
 #'   each pressure type. nIter larger than 1 allow to estimate prediction
 #'   uncertainty and improve model robustness.
 #'
 #' @param nCores an integer indicating the number of CPU cores available to
 #'   parallelize the calibration step
+#'
+#' @param trainingFrac
+#'
+#' @param samplingUnit
+#'
+#' @param samplingSeed
 #'
 #' @return nothing, the models and used data are saved as .rda objects in the
 #'   directory corresponding to the pathDT argument.
@@ -73,7 +79,10 @@ build_DT <- function(metrics,
                                       min.node.size   = 25),
                      CVfolds      = 5,
                      nIter        = 1L,
-                     nCores       = 1L) {
+                     nCores       = 1L,
+                     trainingFrac = 1,
+                     samplingUnit = NULL,
+                     samplingSeed = 20181025) {
 
   set.seed(2017)
 
@@ -96,22 +105,18 @@ build_DT <- function(metrics,
 
      pressure <- NULL
 
-    trainingData <- data.frame(pressure = pressures[[p]],
-                               metrics) %>%
-      (function(df) {
-        colnames(df) <- c("pressure", colnames(metrics))
+    allData <- data.frame(pressure = pressures[[p]],
+                               metrics)                      %>%
+      dplyr::mutate(
+        pressure = dplyr::case_when(pressure %in% low      ~ "low",
+                                    pressure %in% impaired ~ "impaired",
+                                    TRUE                   ~ NA_character_) %>%
+               factor(x = ., levels = c("low", "impaired"))) %>%
+      split_training_test(data = ., frac = trainingFrac,
+                          group = samplingUnit, seed = samplingSeed)
 
-        df$pressure <- as.character(df$pressure) %>%
-          gsub(pattern = paste(low, collapse = "|"),
-               replacement = "low")              %>%
-          gsub(pattern = paste(impaired, collapse = "|"),
-               replacement = "impaired")         %>%
-          factor(levels = c("low", "impaired"))
-
-        df
-      })                                         %>%
-      dplyr::filter(!is.na(pressure))
-
+    trainingData <- allData$training
+    testData     <- allData$test
 
     selMetrics    <- colnames(trainingData)[-1]
 
@@ -126,6 +131,7 @@ build_DT <- function(metrics,
                                  params         = params,
                                  p              = p,
                                  nCores         = nCores)
+
       bestParams <- tunedModel$opt.path %>%
         as.data.frame()                 %>%
         dplyr::select(num.trees, mtry, sample.fraction,
@@ -144,16 +150,18 @@ build_DT <- function(metrics,
                                   ellapsedTime = timeboth.test.mean) %>%
         dplyr::mutate(auc_diff = (max(AUC) - AUC) / (1 - min(AUC)),
                       time_diff = (ellapsedTime - min(ellapsedTime)) /
-                        (max(ellapsedTime) - min(ellapsedTime))) %>%
-        dplyr::mutate(weight = 2/3 * auc_diff + 1/3 * time_diff) %>%
-        dplyr::filter(weight == min(weight)) %>%
+                        (max(ellapsedTime) - min(ellapsedTime)))     %>%
+        dplyr::mutate(weight = 2/3 * auc_diff + 1/3 * time_diff)     %>%
+        dplyr::filter(weight == min(weight))                         %>%
         dplyr::mutate(num.trees = as.character(num.trees) %>%
                         as.numeric(),
-                      mtry = as.character(mtry) %>%
+                      mtry = as.character(mtry)           %>%
                         as.numeric(),
-                      sample.fraction = as.character(sample.fraction) %>%
+                      sample.fraction = sample.fraction   %>%
+                        as.character()                    %>%
                         as.numeric(),
-                      min.node.size = as.character(min.node.size) %>%
+                      min.node.size = min.node.size       %>%
+                        as.character()                    %>%
                         as.numeric()
         )
 
@@ -197,7 +205,7 @@ build_DT <- function(metrics,
                                  measures  = list(mlr::auc, mlr::timeboth),
                                  show.info = FALSE)
 
-        save(DTunit, trainingData, task,
+        save(DTunit, trainingData, testData, task,
              file = file.path(pathDT, paste0("model_", p, ".rda")))
 
         cat("    DONE")
