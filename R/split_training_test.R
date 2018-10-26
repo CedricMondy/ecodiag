@@ -1,7 +1,5 @@
 #' @importFrom dplyr "%>%"
-split_training_test <- function(data, frac, group = NULL, seed = 20181025){
-
-  set.seed(seed = seed)
+split_training_test <- function(data, frac, group = NULL){
 
   data <- dplyr::filter(data, ! is.na(pressure))
 
