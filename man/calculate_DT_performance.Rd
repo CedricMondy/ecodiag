@@ -11,13 +11,13 @@ calculate_DT_performance(pathDT, testMetrics = NULL,
 \arguments{
 \item{pathDT}{character string, the path where the built models will be saved}
 
-\item{low}{character vectors with the labels of the pressure
-classes (in \code{pressures}) corresponding to low impact and impaired
-situations, respectively.}
+\item{low}{character vectors with the labels of the pressure classes
+(in \code{pressures}) corresponding to low impact and impaired situations,
+respectively.}
 
-\item{impaired}{character vectors with the labels of the pressure
-classes (in \code{pressures}) corresponding to low impact and impaired
-situations, respectively.}
+\item{impaired}{character vectors with the labels of the pressure classes
+(in \code{pressures}) corresponding to low impact and impaired situations,
+respectively.}
 
 \item{smoothROC}{if TRUE, the ROC curve is passed to \link[pROC:smooth]{smooth}
 to be smoothed.}
