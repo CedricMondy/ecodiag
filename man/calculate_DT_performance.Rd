@@ -37,8 +37,9 @@ the one used to train the DT.
 \details{
 The function will calculate the ROC curves (smoothed or not depending on
 argument \code{smoothROC}) and the corresponding Area Under the Curve (AUC) for
-each of the DT models using (i) the training data set stored in the models
-and (ii) a test data set (provided using \code{pressures} and \code{metrics}).
+each of the DT models using (i) the test data set stored with the models
+and (ii) a different test data set (provided using \code{testPressures} and
+\code{testMetrics}).
 }
 \seealso{
 \link[pROC:roc]{roc} \link{build_DT}

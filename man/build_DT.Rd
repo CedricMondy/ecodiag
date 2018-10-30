@@ -25,10 +25,11 @@ respectively.}
 \item{pathDT}{character string, the path where the built models will be saved}
 
 \item{params}{a named list with the values, one or two (minimum, maximum) of
-the following parameters: - num.trees: Number of trees to grow; - mtry:
-Number of variables randomly sampled as candidates at each split; -
-sample.fraction: Proportion of samples to draw; - min.node.size: Minimum
-size of terminal nodes.}
+the following parameters:
+- num.trees: Number of trees to grow;
+- mtry: Number of variables randomly sampled as candidates at each split;
+- sample.fraction: Proportion of samples to draw;
+- min.node.size: Minimum size of terminal nodes.}
 
 \item{CVfolds}{an integer indicating the number of parts made from the
 training data set and used to calibrate the model hyper-parameters.}
@@ -96,7 +97,7 @@ not among the rows. If a site has observations with different pressure levels
 allocated to the site.
 
 The hyper-parameters of the \link[ranger:ranger]{ranger} model are given in the
-params argument that could accpt one or a range of values (minimum and
+params argument that could accept one or a range of values (minimum and
 maximum) per parameter. If a range of parameter values is given, then an
 optimization procedure using \link[mlr:tuneParamsMultiCrit]{tuneParamsMultiCrit}
 is performed to identify the parameter set exhibiting the best trade-off
