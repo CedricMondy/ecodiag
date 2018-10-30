@@ -31,7 +31,7 @@
 #' allocated to the site.
 #'
 #' The hyper-parameters of the [ranger][ranger::ranger] model are given in the
-#' params argument that could accpt one or a range of values (minimum and
+#' params argument that could accept one or a range of values (minimum and
 #' maximum) per parameter. If a range of parameter values is given, then an
 #' optimization procedure using [tuneParamsMultiCrit][mlr::tuneParamsMultiCrit]
 #' is performed to identify the parameter set exhibiting the best trade-off
