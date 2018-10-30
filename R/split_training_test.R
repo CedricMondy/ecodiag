@@ -1,6 +1,9 @@
 #' @importFrom dplyr "%>%"
 split_training_test <- function(data, frac, group = NULL){
 
+  if (! is.null(group))
+    group <- group[!is.na(data$pressure)]
+
   data <- dplyr::filter(data, ! is.na(pressure))
 
   if (!is.null(group)) {
