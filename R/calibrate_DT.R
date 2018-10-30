@@ -2,44 +2,61 @@
 calibrate_DT <- function(trainingData, CVfolds = 5,
                          selMetrics,
                          params,
-                         p, nCores) {
+                         p, nCores, calibPopSize, calibGenNb) {
+
+  overSamplingRatio <- max(table(trainingData$pressure)) /
+    min(table(trainingData$pressure))
 
   learner <- mlr::makeLearner(cl           = "classif.ranger",
                               predict.type = "prob",
                               num.threads  = nCores,
-                              replace      = FALSE)
+                              replace      = FALSE) %>%
+    mlr::makeSMOTEWrapper(learner = ., sw.rate = overSamplingRatio)
 
   task <- mlr::makeClassifTask(data     = trainingData[, c("pressure", selMetrics)],
                                target   = "pressure",
                                positive = "impaired")
 
-  control <- mlr::makeTuneControlGrid()
+  control <- mlr::makeTuneMultiCritControlNSGA2(popsize     = calibPopSize,
+                                                generations = calibGenNb)
 
   sampler <- mlr::makeResampleDesc(method        = "CV",
                                    predict       = "test",
                                    iters         = CVfolds,
                                    stratify      = TRUE)
 
+  set_param <- function(param, params) {
+      if (param == "sample.fraction") {
+        ParamHelpers::makeNumericParam(param,
+                                       lower = min(params[[param]]) - 1e-6,
+                                       upper = max(params[[param]]) + 1e-6,
+                                       tunable = min(params[[param]]) !=
+                                         max(params[[param]]))
+      } else {
+        ParamHelpers::makeIntegerParam(param,
+                                       lower = min(params[[param]]) - 1e-6,
+                                       upper = max(params[[param]]) + 1e-6,
+                                       tunable = min(params[[param]]) !=
+                                         max(params[[param]]))
+      }
+  }
+
   paramSet <- ParamHelpers::makeParamSet(
-    ParamHelpers::makeDiscreteParam("num.trees",
-                                    values = params$num.trees),
-    ParamHelpers::makeDiscreteParam("mtry",
-                                    values = params$mtry),
-    ParamHelpers::makeDiscreteParam("sample.fraction",
-                                    values = params$sample.fraction),
-    ParamHelpers::makeDiscreteParam("min.node.size",
-                                    values = params$min.node.size)
+    set_param("num.trees", params),
+    set_param("mtry", params),
+    set_param("sample.fraction", params),
+    set_param("min.node.size", params)
   )
 
   if (min(table(trainingData$pressure)) >= 100) {
 
-    mlr::tuneParams(learner    = learner,
-                    task       = task,
-                    resampling = sampler,
-                    measures   = list(mlr::auc, mlr::timeboth),
-                    par.set    = paramSet,
-                    control    = control,
-                    show.info  = FALSE)
+    mlr::tuneParamsMultiCrit(learner    = learner,
+                             task       = task,
+                             resampling = sampler,
+                             measures   = list(mlr::auc, mlr::timeboth),
+                             par.set    = paramSet,
+                             control    = control,
+                             show.info  = TRUE)
   } else {
     warning("Not enough training data to build a model for ", p,
             "\n    not impaired: ",
