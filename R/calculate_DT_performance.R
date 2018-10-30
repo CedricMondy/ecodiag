@@ -6,8 +6,9 @@
 #'
 #' The function will calculate the ROC curves (smoothed or not depending on
 #' argument `smoothROC`) and the corresponding Area Under the Curve (AUC) for
-#' each of the DT models using (i) the training data set stored in the models
-#' and (ii) a test data set (provided using `pressures` and `metrics`).
+#' each of the DT models using (i) the test data set stored with the models
+#' and (ii) a different test data set (provided using `testPressures` and
+#' `testMetrics`).
 #'
 #' @inheritParams build_DT
 #'
@@ -79,8 +80,8 @@ calculate_DT_performance <- function(pathDT,
               })
       }
 
-      testRocs <- calc_roc(pressures = pressures,
-                           metrics   = metrics,
+      testRocs <- calc_roc(pressures = testPressures,
+                           metrics   = testMetrics,
                            p         = pressureList[i],
                            low       = low,
                            impaired  = impaired,
