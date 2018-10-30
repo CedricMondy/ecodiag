@@ -4,10 +4,14 @@ calibrate_DT <- function(trainingData, CVfolds = 5,
                          params,
                          p, nCores, calibPopSize, calibGenNb) {
 
+  overSamplingRatio <- max(table(trainingData$pressure)) /
+    min(table(trainingData$pressure))
+
   learner <- mlr::makeLearner(cl           = "classif.ranger",
                               predict.type = "prob",
                               num.threads  = nCores,
-                              replace      = FALSE)
+                              replace      = FALSE) %>%
+    mlr::makeSMOTEWrapper(learner = ., sw.rate = overSamplingRatio)
 
   task <- mlr::makeClassifTask(data     = trainingData[, c("pressure", selMetrics)],
                                target   = "pressure",

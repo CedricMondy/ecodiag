@@ -195,14 +195,18 @@ build_DT <- function(metrics,
                                         file = paste0(pathDT, "log.csv"),
           sep = ";", append = TRUE, row.names = FALSE))
 
+    overSamplingRatio <- max(table(trainingData$pressure)) /
+      min(table(trainingData$pressure))
+
     learner <- mlr::makeLearner(cl           = "classif.ranger",
                                 predict.type = "prob",
                                 num.threads  = nCores,
                                 replace      = FALSE) %>%
-      setHyperPars(learner = .,
-                   par.vals = bestParams %>%
-                     dplyr::select(-AUC, -ellapsedTime) %>%
-                     as.list())
+      mlr::setHyperPars(learner = .,
+                        par.vals = bestParams %>%
+                          dplyr::select(-AUC, -ellapsedTime) %>%
+                          as.list()) %>%
+      mlr::makeSMOTEWrapper(learner = ., sw.rate = overSamplingRatio)
 
     task <- mlr::makeClassifTask(data     = trainingData[, c("pressure",
                                                              selMetrics)],
@@ -217,6 +221,17 @@ build_DT <- function(metrics,
                                  keep.pred = TRUE,
                                  measures  = list(mlr::auc, mlr::timeboth),
                                  show.info = FALSE)
+
+    thresholdData <-
+      mlr::generateThreshVsPerfData(obj = DTunit,
+                                    measures = list(mlr::tpr, mlr::tnr))$data
+
+    funTPR <- with(thresholdData, stats::approxfun(x = threshold, y = tpr))
+    funTNR <- with(thresholdData, stats::approxfun(x = threshold, y = tnr))
+
+    DTunit$threshold <-
+      stats::optimize(f = function(x) abs(funTPR(x) - funTNR(x)),
+                      interval = c(0,1))$minimum
 
         save(DTunit, trainingData, testData, task,
              file = file.path(pathDT, paste0("model_", p, ".rda")))
