@@ -1,7 +1,7 @@
 Package: ecodiag
 Type: Package
 Title: Build Standardized Diagnostic Tool Models
-Version: 0.0.4
+Version: 0.0.5
 Authors@R: person("Mondy", "Cedric", email = "cedric.mondy@gmail.com",
     role = c("aut", "cre"))
 Description: Build standardized Diagnostic Tool Models to predict anthropogenic pressure
