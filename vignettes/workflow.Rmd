@@ -19,19 +19,13 @@ knitr::opts_chunk$set(
 
 knitr::knit_hooks$set(
    error = function(x, options) {
-     paste('\n\n
-
-', sep = '\n')
+     paste('\n\n', sep = '\n')
    },
    warning = function(x, options) {
-     paste('\n\n
-
-', sep = '\n')
+     paste('\n\n', sep = '\n')
    },
    message = function(x, options) {
-     paste('\n\n
-
-', sep = '\n')
+     paste('\n\n', sep = '\n')
    }
 )
 
@@ -74,7 +68,7 @@ The first step is to build the DT model using the learning data set. The used ra
 
 The `build_DT` function returns no objects to R but instead writes the built models to the location indicated by the `pathDT` argument.
 
-If the data available are large enough, it is advised to split them in a learning and a test data sets using the arguments `samplingUnit` and `trainingFrac` that defines what is the unit being sampled to constitute the training and test data sets (by default, NULL, the rows) and the fraction of these units that will be kept in the training data set. By default, `trainingFrac` = 1 meaning that all the data are used to train the models and none is kept to test it. In order to allow the replicability of the construction of the trainig and test data sets, we set the seed of the R random number generator using the `samplingSeed` argument.
+If the data available are large enough, it is advised to split them in a learning and a test data sets using the arguments `samplingUnit` and `trainingFrac` that defines what is the unit being sampled to constitute the training and test data sets (by default, NULL, the rows) and the fraction of these units that will be kept in the training data set. By default, `trainingFrac` is set to 1 meaning that all the data are used to train the models and none is kept to test it. In order to allow the replicability of the construction of the trainig and test data sets, we set the seed of the R random number generator using the `samplingSeed` argument.
 
 In order to have more robust predictions, we can build several random forests for each DT unit and the global prediction will be the average of the individual predictions. The use of several *iterations* of the model can also be used to evaluate the structural variability of the DT unit. The number of iterations is set using the `nIter` argument.
 
@@ -89,12 +83,11 @@ build_DT(metrics   = metrics,
                           sample.fraction = 0.632, 
                           min.node.size   = 25),
          nIter        = 4, 
-         trainingFrac = 0.75
-         )
+         trainingFrac = 0.75)
 ```
 
 #### Building and calibrating a DT model
-Random forests, and machine learning algorithms in general, can overfit the training data. Therefore, if we want to use the DT model to predict driver probability of occurence on new data, we should minimize this overfitting. In order to do so, we implemented the ability to test different combinations of the random forest meta-parameters using a cross-validation (CV) procedure. This procedure compare the CV performances between the different combinations of meta-parameter values using the `mlr` package.
+Random forests, and machine learning algorithms in general, can overfit the training data. Therefore, if we want to use the DT model to predict driver probability of occurence on new data, we should minimize this overfitting. In order to do so, we implemented the ability to calibrate the random forest meta-parameters using a cross-validation (CV) procedure. If a hyper-parameter is to be calibrated one should provide a range of values (lower-upper) instead of a single value. This procedure compares the CV performances (both in terms of AUC and execution time) between the different combinations of meta-parameter values using the `mlr` package.
 
 ```{r calibration, eval=FALSE}
 build_DT(metrics   = metrics,
@@ -103,13 +96,15 @@ build_DT(metrics   = metrics,
          impaired  = c("moderate", "poor", "bad"),
          pathDT    = "calibrated_models/",
          params    = list(
-           num.trees       = c(500, 750, 1000, 1500),
-           mtry            = c(5, 10, 25, 50),
+           num.trees       = c(lower = 100, upper = 2000),
+           mtry            = c(lower = 5, upper = 50),
            sample.fraction = 0.632,
-           min.node.size   = 25),
-         CVfolds      = 5,
-         trainingFrac = 0.75
-         )
+           min.node.size   = c(lower = 10, upper = 50)),
+         CVfolds      = 3,
+         trainingFrac = 0.75,
+         nCores       = 4,
+         calibPopSize = 4,
+         calibGenNb   = 3)
 ```
 
 When building the DT model, a log file is also created in the `pathDT` directory. This log contains the best meta-parameter values, i.e. the `params` values selected to build each of the DT units. If no calibration was performed, then the `params` values are returned.
@@ -129,20 +124,18 @@ build_DT(metrics   = metrics,
                           min.node.size   = 25),
          nIter     = 4,
          nCores    = 4,
-         trainingFrac = 0.75
-         )
+         trainingFrac = 0.75)
 ```
 
 ### Evaluating the DT model performances: `calculate_DT_performance`
 The DT models generated with the `build_DT` function are binary classification models. To evaluate their performances, we chose to use the criteria Area Under the Curve (AUC) calculated with the `roc` package. This AUC criteria is a numeric value between 0 and 1 with values close to 0.5 indicating a random model and values above 0.7 indicating models with decent performances [@pearce_evaluating_2000].
 
-The function `calculate_DT_performance` calculates the ROC curves (smoothed or not depending on argument `smoothROC`) and the corresponding Area Under the Curve (AUC) for each of the DT models using (i) the training data set stored in the models and (ii) a test data set (provided using `pressures` and `metrics`).
+The function `calculate_DT_performance` calculates the ROC curves (smoothed or not depending on argument `smoothROC`) and the corresponding Area Under the Curve (AUC) for each of the DT models using (i) the test data set stored with the models (default) and (ii) a different test data set (provided using `testPressures` and `testMetrics`).
 
 ```{r evaluation}
 modelPerformances <- 
   calculate_DT_performance(pathDT    = "models/",
-                           smoothROC = TRUE
-                           )
+                           smoothROC = TRUE)
 ```
 
 ```{r AUC-table}
