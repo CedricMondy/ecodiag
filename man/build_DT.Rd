@@ -7,8 +7,8 @@
 build_DT(metrics, pressures, low = "low", impaired = "impaired",
   pathDT, params = list(num.trees = 500, mtry = 25, sample.fraction =
   0.632, min.node.size = 25), CVfolds = 5, nIter = 1L, nCores = 1L,
-  trainingFrac = 1, samplingUnit = NULL, calibPopSize = 10,
-  calibGenNb = 10, seed = 20181025)
+  trainingFrac = 1, samplingUnit = NULL, calibPopSize = 100,
+  calibGenNb = 1, seed = 20181025)
 }
 \arguments{
 \item{metrics}{a data frame with samples in rows and biological metrics in
@@ -97,13 +97,18 @@ not among the rows. If a site has observations with different pressure levels
 allocated to the site.
 
 The hyper-parameters of the \link[ranger:ranger]{ranger} model are given in the
-params argument that could accept one or a range of values (minimum and
-maximum) per parameter. If a range of parameter values is given, then an
-optimization procedure using \link[mlr:tuneParamsMultiCrit]{tuneParamsMultiCrit}
-is performed to identify the parameter set exhibiting the best trade-off
-between performance (AUC) and execution time.
+params argument that could accept one or several values per parameter. If
+several values are given, an optimization procedure using
+\link[mlr:tuneParamsMultiCrit]{tuneParamsMultiCrit} is performed to identify the
+parameter set exhibiting the best trade-off between performance (AUC) and
+execution time. Two optimization algorithms are implemented: a grid search
+and a genetic optimization algorithm. If the argument \code{calibGenNb} is larger
+than one then the genetic algorithm is used and the space search for each
+parameter is determined by the minimum and maximum values given in \code{params}.
+If \code{calibGenNb} is smaller or equal to 1, then a grid search testing all the
+\code{params} value combinations is performed.
 }
 \seealso{
 \link[ranger:ranger]{ranger}
-\link[mlr:tuneParamsMultiCrit]{tuneParamsMultiCrit} \link[mco:nsga2]{nsga2}
+\link[mlr:tuneParamsMultiCrit]{tuneParamsMultiCrit}
 }

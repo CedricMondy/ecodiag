@@ -17,14 +17,9 @@ calibrate_DT <- function(trainingData, CVfolds = 5,
                                target   = "pressure",
                                positive = "impaired")
 
-  control <- mlr::makeTuneMultiCritControlNSGA2(popsize     = calibPopSize,
-                                                generations = calibGenNb)
-
-  sampler <- mlr::makeResampleDesc(method        = "CV",
-                                   predict       = "test",
-                                   iters         = CVfolds,
-                                   stratify      = TRUE)
-
+  if (calibGenNb > 1) {
+    control <- mlr::makeTuneMultiCritControlNSGA2(popsize     = calibPopSize,
+                                                  generations = calibGenNb)
   set_param <- function(param, params) {
       if (param == "sample.fraction") {
         ParamHelpers::makeNumericParam(param,
@@ -40,6 +35,19 @@ calibrate_DT <- function(trainingData, CVfolds = 5,
                                          max(params[[param]]))
       }
   }
+
+  } else {
+    control <- mlr::makeTuneMultiCritControlGrid()
+
+    set_param <- function(param, params) {
+      ParamHelpers::makeDiscreteParam(param, values = params[[param]])
+    }
+  }
+
+  sampler <- mlr::makeResampleDesc(method        = "CV",
+                                   predict       = "test",
+                                   iters         = CVfolds,
+                                   stratify      = TRUE)
 
   paramSet <- ParamHelpers::makeParamSet(
     set_param("num.trees", params),
