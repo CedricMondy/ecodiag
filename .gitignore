@@ -6,3 +6,5 @@
 temp/*
 vignettes/models
 *.bib
+man/*
+*.Rd
