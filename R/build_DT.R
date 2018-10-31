@@ -31,11 +31,16 @@
 #' allocated to the site.
 #'
 #' The hyper-parameters of the [ranger][ranger::ranger] model are given in the
-#' params argument that could accept one or a range of values (minimum and
-#' maximum) per parameter. If a range of parameter values is given, then an
-#' optimization procedure using [tuneParamsMultiCrit][mlr::tuneParamsMultiCrit]
-#' is performed to identify the parameter set exhibiting the best trade-off
-#' between performance (AUC) and execution time.
+#' params argument that could accept one or several values per parameter. If
+#' several values are given, an optimization procedure using
+#' [tuneParamsMultiCrit][mlr::tuneParamsMultiCrit] is performed to identify the
+#' parameter set exhibiting the best trade-off between performance (AUC) and
+#' execution time. Two optimization algorithms are implemented: a grid search
+#' and a genetic optimization algorithm. If the argument `calibGenNb` is larger
+#' than one then the genetic algorithm is used and the space search for each
+#' parameter is determined by the minimum and maximum values given in `params`.
+#' If `calibGenNb` is smaller or equal to 1, then a grid search testing all the
+#' `params` value combinations is performed.
 #'
 #' @param metrics a data frame with samples in rows and biological metrics in
 #'   columns
@@ -90,7 +95,7 @@
 #'   directory corresponding to the pathDT argument.
 #'
 #' @seealso [ranger][ranger::ranger]
-#'   [tuneParamsMultiCrit][mlr::tuneParamsMultiCrit] [nsga2][mco::nsga2]
+#'   [tuneParamsMultiCrit][mlr::tuneParamsMultiCrit]
 #'
 #' @importFrom dplyr "%>%"
 #' @export
@@ -108,8 +113,8 @@ build_DT <- function(metrics,
                      nCores       = 1L,
                      trainingFrac = 1,
                      samplingUnit = NULL,
-                     calibPopSize = 10,
-                     calibGenNb   = 10,
+                     calibPopSize = 100,
+                     calibGenNb   = 1,
                      seed         = 20181025) {
 
   set.seed(seed)

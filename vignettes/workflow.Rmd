@@ -87,7 +87,7 @@ build_DT(metrics   = metrics,
 ```
 
 #### Building and calibrating a DT model
-Random forests, and machine learning algorithms in general, can overfit the training data. Therefore, if we want to use the DT model to predict driver probability of occurence on new data, we should minimize this overfitting. In order to do so, we implemented the ability to calibrate the random forest meta-parameters using a cross-validation (CV) procedure. If a hyper-parameter is to be calibrated one should provide a range of values (lower-upper) instead of a single value. This procedure compares the CV performances (both in terms of AUC and execution time) between the different combinations of meta-parameter values using the `mlr` package.
+Random forests, and machine learning algorithms in general, can overfit the training data. Therefore, if we want to use the DT model to predict driver probability of occurence on new data, we should minimize this overfitting. In order to do so, we implemented the ability to calibrate the random forest meta-parameters using a cross-validation (CV) procedure. If a hyper-parameter is to be calibrated one should provide several values instead of a single one. This procedure compares the CV performances (both in terms of AUC and execution time) between the different combinations of meta-parameter values using the `mlr` package.
 
 ```{r calibration, eval=FALSE}
 build_DT(metrics   = metrics,
@@ -96,15 +96,13 @@ build_DT(metrics   = metrics,
          impaired  = c("moderate", "poor", "bad"),
          pathDT    = "calibrated_models/",
          params    = list(
-           num.trees       = c(lower = 100, upper = 2000),
-           mtry            = c(lower = 5, upper = 50),
+           num.trees       = c(100, 500, 1000, 2000),
+           mtry            = c(5, 25, 50),
            sample.fraction = 0.632,
-           min.node.size   = c(lower = 10, upper = 50)),
+           min.node.size   = c(10, 25, 50)),
          CVfolds      = 3,
          trainingFrac = 0.75,
-         nCores       = 4,
-         calibPopSize = 4,
-         calibGenNb   = 3)
+         nCores       = 4)
 ```
 
 When building the DT model, a log file is also created in the `pathDT` directory. This log contains the best meta-parameter values, i.e. the `params` values selected to build each of the DT units. If no calibration was performed, then the `params` values are returned.
