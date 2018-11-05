@@ -41,7 +41,13 @@ run_DT <- function(pathDT, metrics) {
                                pred.all    = FALSE)
                     })    %>%
     do.call(what = cbind) %>%
-    data.frame(ID = rownames(metrics), .)
+    (function(df) {
+      if ("ID" %in% colnames(metrics)) {
+        data.frame(ID = metrics$ID, df)
+      } else {
+        data.frame(ID = rownames(metrics), df)
+      }
+    })
 
   colnames(preds) <- c("ID", pressureList)
 
